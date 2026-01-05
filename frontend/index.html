@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 智能面试辅助系统v1.0，作者刘梦畅 -->
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 智能面试辅助系统</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1>🎯 智能面试辅助系统</h1>
+            </div>
+            
+            <div class="auth-tabs">
+                <a href="index.html" class="tab-btn active">登录</a>
+                <a href="register.html" class="tab-btn">注册</a>
+            </div>
+
+            <!-- 登录表单 -->
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="login-username">用户名</label>
+                    <input type="text" id="login-username" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码" required>
+                </div>
+                <div class="form-group remember-password">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="remember-password">
+                        <span>记住密码</span>
+                    </label>
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-primary">立即登录</button>
+                <div id="login-error" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loading-message">处理中...</p>
+    </div>
+
+    <script src="js/index.js"></script>
+</body>
+</html>

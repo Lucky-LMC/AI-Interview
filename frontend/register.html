@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 智能面试辅助系统v1.0，作者刘梦畅 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 智能面试辅助系统</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/register.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1>🎯 智能面试辅助系统</h1>
+            </div>
+            
+            <div class="auth-tabs">
+                <a href="index.html" class="tab-btn">登录</a>
+                <a href="register.html" class="tab-btn active">注册</a>
+            </div>
+
+            <!-- 注册表单 -->
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label for="register-username">新用户名</label>
+                    <input type="text" id="register-username" placeholder="请输入用户名（至少3个字符）" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">设置密码</label>
+                    <input type="password" id="register-password" placeholder="请输入密码（至少3个字符）" required>
+                </div>
+                <button type="submit" id="register-btn" class="btn btn-primary">立即注册</button>
+                <div id="register-error" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loading-message">处理中...</p>
+    </div>
+
+    <script src="js/register.js"></script>
+</body>
+</html>
+

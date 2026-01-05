@@ -1,0 +1,44 @@
+# 使用清华大学镜像源加速下载
+# pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# LangChain 和 LangGraph (Agent 核心依赖)
+langgraph>=0.2.0
+langgraph-cli[inmem]
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-google-genai>=2.0.0
+
+# OpenAI
+openai>=1.0.0
+
+# FastAPI 后端框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# 数据库
+SQLAlchemy>=2.0.0
+pymysql>=1.1.0
+
+# Streamlit 前端框架
+streamlit>=1.28.0
+
+# HTTP 请求
+requests>=2.31.0
+
+# 文档处理 (Agent 文档解析工具)
+PyPDF2>=3.0.0
+python-docx>=1.0.0
+
+# 可视化（工作流图等调试工具）
+matplotlib>=3.8.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 数据验证
+pydantic>=2.0.0
+
+# 类型提示支持
+typing-extensions>=4.0.0
