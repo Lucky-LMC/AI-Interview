@@ -31,6 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 # 注册路由
 app.include_router(interview_router)
 app.include_router(auth_router)
@@ -38,15 +41,9 @@ app.include_router(auth_router)
 # 初始化数据库（确保用户表存在）
 init_db()
 
-
-@app.get("/")
-async def root():
-    """根路径"""
-    return {
-        "message": "AI 模拟面试系统 API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+# 挂载前端静态文件目录 (放在最后，确保不遮挡 API 路由)
+frontend_path = project_root / "frontend"
+app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 
 @app.get("/health")
