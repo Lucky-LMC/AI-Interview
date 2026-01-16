@@ -56,8 +56,6 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        # host="172.18.174.107",
-        # python -m http.server 8080
         host="0.0.0.0",
         port=8000,
         reload=True

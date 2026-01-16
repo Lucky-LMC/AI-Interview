@@ -1,5 +1,9 @@
 /* AI模拟面试系统v1.0，作者刘梦畅 */
-/* 全局样式和共享样式 */
+/* 全局样式 - AI 实验室风格 (AI Lab) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+/* 引入代码字体 */
+
 * {
     margin: 0;
     padding: 0;
@@ -7,159 +11,159 @@
 }
 
 :root {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --secondary-color: #6b7280;
-    --success-color: #10b981;
-    --error-color: #ef4444;
-    --warning-color: #f59e0b;
-    --bg-color: #f9fafb;
-    --card-bg: #ffffff;
-    --text-primary: #111827;
-    --text-secondary: #6b7280;
-    --border-color: #e5e7eb;
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    /* 核心色板 - 明亮科技 */
+    --bg-color: #f0f4f8;
+    /* 浅蓝灰背景 */
+    --card-bg: rgba(255, 255, 255, 0.9);
+
+    /* 品牌色 - 科技蓝 */
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --accent-color: #06b6d4;
+    /* 青色点缀 */
+
+    /* 文字颜色 */
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-light: #94a3b8;
+
+    /* 边框与阴影 */
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 20px 40px -10px rgba(37, 99, 235, 0.1);
+    /* 蓝色系投影 */
+    --shadow-glow: 0 0 15px rgba(37, 99, 235, 0.3);
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-primary);
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
 }
 
 .hidden {
     display: none !important;
 }
 
-/* 表单样式 */
+/* 表单组件 - 极简科技 */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    position: relative;
 }
 
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-.form-group input,
-.form-group textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     font-size: 14px;
-    transition: border-color 0.3s;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: space-between;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 15px;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.form-group input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
-.form-group small {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-secondary);
-    font-size: 12px;
+.form-group input::placeholder {
+    color: var(--text-light);
 }
 
-/* 按钮样式 */
+/* 按钮组件 - 科技胶囊 */
 .btn {
-    padding: 12px 24px;
+    width: 100%;
+    padding: 14px 24px;
     border: none;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s;
-    display: inline-block;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
 }
 
 .btn-primary {
-    background-color: var(--primary-color);
+    background: var(--primary-color);
     color: white;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
-.btn-primary:hover:not(:disabled) {
-    background-color: var(--primary-hover);
+/* 按钮悬停时的光扫效果 */
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: 0.5s;
 }
 
-.btn-secondary {
-    background-color: var(--secondary-color);
-    color: white;
+.btn-primary:hover::after {
+    left: 100%;
 }
 
-.btn-secondary:hover:not(:disabled) {
-    background-color: #4b5563;
+.btn-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
 }
 
-.btn-sm {
-    padding: 8px 16px;
-    font-size: 12px;
-}
-
-.btn-large {
-    padding: 16px 32px;
-    font-size: 16px;
-}
-
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.button-group {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
+.btn-primary:active {
+    transform: translateY(0);
 }
 
 /* 消息提示 */
-.info-message {
-    padding: 20px;
-    background-color: #dbeafe;
-    border-left: 4px solid #3b82f6;
-    border-radius: 8px;
-    color: #1e40af;
-}
-
 .error-message {
     margin-top: 16px;
     padding: 12px;
-    background-color: #fee2e2;
-    border-left: 4px solid var(--error-color);
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
     border-radius: 8px;
-    color: #991b1b;
+    color: #e11d48;
+    font-size: 14px;
     display: none;
+    align-items: center;
+    gap: 8px;
+    animation: slideDown 0.3s ease;
+}
+
+.error-message::before {
+    content: "⚠️";
 }
 
 .error-message.show {
-    display: block;
+    display: flex;
 }
 
-.success-message {
-    margin-top: 16px;
-    padding: 12px;
-    background-color: #d1fae5;
-    border-left: 4px solid var(--success-color);
-    border-radius: 8px;
-    color: #065f46;
-}
-
-/* 加载提示 */
+/* 加载动画 - 科技圆环 */
 .loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    inset: 0;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -170,26 +174,34 @@ body {
 .spinner {
     width: 50px;
     height: 50px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
+    animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
 }
 
 .loading-overlay p {
     margin-top: 20px;
-    color: white;
-    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    /* 代码字体 */
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .button-group {
-        flex-direction: column;
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }
 
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
