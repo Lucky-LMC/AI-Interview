@@ -3,8 +3,8 @@
 评价节点
 直接使用 LLM 对回答进行评价并生成反馈
 """
-from backend.models.state import InterviewState
-from .llm_helper import get_shared_llm
+from backend.graph.state import InterviewState
+from backend.graph.llm import get_shared_llm
 
 # 系统提示词
 EVALUATOR_SYSTEM_PROMPT = """你是一位专业的技术面试官，负责对面试回答进行评价并生成反馈。

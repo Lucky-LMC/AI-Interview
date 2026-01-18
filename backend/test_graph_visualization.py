@@ -1,5 +1,12 @@
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from io import BytesIO
-from backend.workflow import create_interview_graph
+from backend.graph.workflow import create_interview_graph
 
 try:
     from PIL import Image as PILImage  # pillow
@@ -19,6 +26,6 @@ if __name__ == "__main__":
     plt.figure(figsize=(6, 5))  # 创建画布，设置大小
     plt.imshow(img)  # 显示图像
     plt.axis('off')  # 隐藏坐标轴
-    plt.title("文章审核工作流程图", fontsize=16, fontweight='bold', pad=20)  # 添加中文标题
+    plt.title("AI智能面试工作流程图", fontsize=16, fontweight='bold', pad=20)  # 添加中文标题
     plt.tight_layout()  # 自动调整布局
     plt.show()  # 显示窗口

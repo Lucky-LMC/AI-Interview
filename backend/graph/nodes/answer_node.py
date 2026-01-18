@@ -3,7 +3,7 @@
 回答节点
 接收用户答案（中断点）
 """
-from backend.models.state import InterviewState
+from backend.graph.state import InterviewState
 
 
 def answer_node(state: InterviewState) -> InterviewState:
@@ -13,4 +13,3 @@ def answer_node(state: InterviewState) -> InterviewState:
     """
     # 答案已经在 state 中了，直接返回
     return state
-

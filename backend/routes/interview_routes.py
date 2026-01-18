@@ -13,14 +13,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from backend.models.state import InterviewState
+from backend.graph.state import InterviewState
 from backend.models.schemas import (
     StartInterviewResponse,
     SubmitAnswerRequest,
     InterviewRecordListResponse,
     InterviewRecordDetailResponse
 )
-from backend.workflow import create_interview_graph
+from backend.graph.workflow import create_interview_graph
 from backend.models import SessionLocal, InterviewRecord
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
@@ -184,7 +184,7 @@ async def start_interview(
 #                 response.question = result_history[-1].get('question', '') if result_history else ''
             
 #         return response
-
+#     
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=f"提交回答失败: {str(e)}")
 
@@ -431,4 +431,3 @@ async def submit_answer_stream(
             "X-Accel-Buffering": "no"  # 禁用 nginx 缓冲（如果使用 nginx 反向代理）
         }
     )
-

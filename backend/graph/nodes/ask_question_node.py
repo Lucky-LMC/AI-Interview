@@ -3,8 +3,8 @@
 出题节点
 直接使用 LLM 智能生成问题
 """
-from backend.models.state import InterviewState
-from .llm_helper import get_shared_llm
+from backend.graph.state import InterviewState
+from backend.graph.llm import get_shared_llm
 
 # 系统提示词
 INTERVIEWER_SYSTEM_PROMPT = """你是一位经验丰富的面试官。

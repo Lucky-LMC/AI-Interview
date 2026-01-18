@@ -5,8 +5,8 @@
 """
 from langgraph.graph import StateGraph, END, START
 from langgraph.checkpoint.memory import MemorySaver
-from backend.models.state import InterviewState
-from backend.nodes import (
+from backend.graph.state import InterviewState
+from backend.graph.nodes import (
     parse_resume_node,    # 解析简历节点
     ask_question_node,    # 出题节点
     answer_node,          # 回答节点（中断点）

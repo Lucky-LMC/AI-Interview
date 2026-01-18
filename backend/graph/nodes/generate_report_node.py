@@ -3,8 +3,8 @@
 生成报告节点
 直接使用 LLM 生成最终面试报告
 """
-from backend.models.state import InterviewState
-from .llm_helper import get_shared_llm
+from backend.graph.state import InterviewState
+from backend.graph.llm import get_shared_llm
 
 # 系统提示词
 REPORT_SYSTEM_PROMPT = """你是一位资深的面试官，负责生成最终的面试报告。
@@ -68,4 +68,3 @@ def generate_report_node(state: InterviewState) -> InterviewState:
     except Exception as e:
         print(f"[generate_report_node] 生成报告失败: {e}", exc_info=True)
         raise
-
