@@ -1,3 +1,4 @@
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 import sys
 from pathlib import Path
 

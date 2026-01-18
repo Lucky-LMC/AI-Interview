@@ -1,10 +1,10 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 评价节点
 直接使用 LLM 对回答进行评价并生成反馈
 """
 from backend.graph.state import InterviewState
-from backend.graph.llm import get_shared_llm
+from backend.graph.llm import gemini_llm
 
 # 系统提示词
 EVALUATOR_SYSTEM_PROMPT = """你是一位专业的技术面试官，负责对面试回答进行评价并生成反馈。
@@ -56,7 +56,7 @@ def evaluate_node(state: InterviewState) -> InterviewState:
 
     # 直接使用 LLM 生成反馈
     try:
-        llm = get_shared_llm()
+        llm = gemini_llm
         
         # 构建用户消息
         user_message = f"""问题：{question}

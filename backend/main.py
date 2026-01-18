@@ -1,4 +1,4 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 FastAPI 主入口文件
 python -m http.server 8080 -d frontend
@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routes import interview_router, auth_router
-from backend.models import init_db
+from backend.config import init_db
 
 # 创建 FastAPI 应用
 app = FastAPI(

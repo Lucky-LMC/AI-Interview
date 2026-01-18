@@ -1,4 +1,4 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 面试记录模型
 """
@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
-from backend.config.database import Base
+from backend.config import Base
 
 
 class InterviewRecord(Base):

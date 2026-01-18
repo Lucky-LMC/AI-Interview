@@ -1,10 +1,10 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 出题节点
 直接使用 LLM 智能生成问题
 """
 from backend.graph.state import InterviewState
-from backend.graph.llm import get_shared_llm
+from backend.graph.llm import gemini_llm
 
 # 系统提示词
 INTERVIEWER_SYSTEM_PROMPT = """你是一位经验丰富的面试官。
@@ -38,7 +38,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
     
     # 直接使用 LLM 生成问题
     try:
-        llm = get_shared_llm()
+        llm = gemini_llm
         
         # 构建历史问题文本
         history_text = "\n".join([

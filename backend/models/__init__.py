@@ -1,8 +1,7 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 模型层 - 导出所有模型
 """
-from backend.config.database import Base, SessionLocal, init_db
 from .user import User
 from .interview_record import InterviewRecord
 from .schemas import (
@@ -15,9 +14,6 @@ from .schemas import (
 )
 
 __all__ = [
-    "Base",
-    "SessionLocal",
-    "init_db",
     "User",
     "InterviewRecord",
     "SubmitAnswerRequest",

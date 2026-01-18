@@ -1,10 +1,10 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 用户模型
 """
 from sqlalchemy import Column, String
 
-from backend.config.database import Base
+from backend.config import Base
 
 
 class User(Base):

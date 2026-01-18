@@ -1,10 +1,10 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 文档解析 Agent
 负责根据文件类型调度相应的解析工具
 """
 from langgraph.prebuilt import create_react_agent
-from backend.graph.llm import get_shared_llm
+from backend.graph.llm import gemini_llm
 from backend.graph.tools import pdf_parser_tool, word_parser_tool
 
 # Agent 系统提示词
@@ -25,7 +25,7 @@ def create_document_agent():
         raise RuntimeError("请先安装 langgraph: pip install langgraph")
     
     tools = [pdf_parser_tool, word_parser_tool]
-    llm = get_shared_llm()
+    llm = gemini_llm
     
     # 使用 langgraph 的 create_react_agent
     return create_react_agent(

@@ -1,4 +1,4 @@
-# AI模拟面试系统v1.0，作者刘梦畅
+﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 路由层 - 面试相关的 API 路由
 基于 LangGraph 工作流的有状态设计
@@ -21,7 +21,8 @@ from backend.models.schemas import (
     InterviewRecordDetailResponse
 )
 from backend.graph.workflow import create_interview_graph
-from backend.models import SessionLocal, InterviewRecord
+from backend.config import SessionLocal
+from backend.models import InterviewRecord
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
