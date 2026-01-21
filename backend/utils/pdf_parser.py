@@ -1,10 +1,9 @@
-﻿# AI智能面试辅助系统V1.0，作者刘梦畅
+# AI智能面试辅助系统V1.0，作者刘梦畅
 """
-PDF 解析工具
+PDF 解析模块
 提供 PDF 文件的文本提取功能
 """
 import os
-from langchain_core.tools import tool
 
 try:
     import PyPDF2
@@ -12,12 +11,9 @@ except ImportError:
     PyPDF2 = None
 
 
-@tool
-def pdf_parser_tool(file_path: str) -> str:
+def parse_pdf(file_path: str) -> str:
     """
     解析 PDF 文件并提取文本内容
-    
-    从 PDF 文件路径中提取所有页面的文本内容。
     
     Args:
         file_path: 文件路径
@@ -54,6 +50,5 @@ def pdf_parser_tool(file_path: str) -> str:
                 return "警告：PDF 文件为空或无法提取文本"
             
     except Exception as e:
-        error_msg = f"PDF 解析错误: {str(e)}"
-        print(error_msg)
+        print(f"PDF 解析错误: {str(e)}")
         return f"错误：PDF 解析失败 - {str(e)}"

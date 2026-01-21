@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <!-- 智能面试辅助系统v1.0，作者刘梦畅 -->
     <meta charset="UTF-8">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/main.css">
 </head>
+
 <body>
     <!-- 左侧边栏 -->
     <aside class="sidebar">
@@ -20,7 +22,9 @@
             <button class="icon-btn" id="user-menu-btn" title="用户设置">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+                    <path
+                        d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24">
+                    </path>
                 </svg>
             </button>
         </div>
@@ -77,18 +81,23 @@
 
         <!-- 底部输入区 -->
         <div class="chat-input-container">
+            <!-- 文件预览区域（上传后显示） -->
+            <div id="file-preview" class="file-preview hidden">
+                <div class="file-preview-card">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="preview-file-name">文件名.pdf</span>
+                    <button class="file-remove-btn" id="remove-file-btn" title="移除文件">×</button>
+                </div>
+            </div>
             <div class="chat-input-wrapper">
                 <button class="input-icon-btn" id="attach-file-btn" title="上传文件">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        <path
+                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                        </path>
                     </svg>
                 </button>
-                <textarea 
-                    id="chat-input" 
-                    class="chat-input" 
-                    placeholder="输入您的回答或上传简历开始面试..."
-                    rows="1"
-                ></textarea>
+                <textarea id="chat-input" class="chat-input" placeholder="输入您的回答或上传简历开始面试..." rows="1"></textarea>
                 <button class="send-btn" id="send-btn" title="发送">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -105,6 +114,19 @@
         <input type="file" id="resume-file-input" accept=".pdf" style="display: none;">
     </main>
 
+    <!-- 简历内容查看模态框 -->
+    <div id="resume-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📄 简历内容</h2>
+                <button class="modal-close" id="close-resume-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="resume-modal-body">
+                <!-- 简历内容将在这里显示 -->
+            </div>
+        </div>
+    </div>
+
     <!-- 加载提示 -->
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="spinner"></div>
@@ -113,4 +135,5 @@
 
     <script src="js/main.js"></script>
 </body>
+
 </html>

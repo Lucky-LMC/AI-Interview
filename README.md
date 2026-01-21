@@ -27,6 +27,23 @@
 - **设计**: 现代简约设计，响应式布局
 - **通信**: SSE (Server-Sent Events) 实现流式输出
 
+### 工作流架构图
+
+系统采用 LangGraph 工作流引擎，实现了完整的面试流程自动化：
+
+![工作流架构图](workflow_graph.png)
+
+**工作流说明**：
+1. **START** → **parse_resume**（简历解析节点）：解析 PDF 格式简历
+2. **parse_resume** → **interviewer_agent**（面试官 Agent）：基于简历生成针对性问题
+3. **interviewer_agent** → **answer**（用户回答节点）：等待用户输入答案（中断点）
+4. **answer** → **evaluator_agent**（评价 Agent）：多维度评估用户回答
+5. **evaluator_agent** → **check_finish**（检查完成节点）：判断是否完成所有轮次
+6. **check_finish** → **interviewer_agent**（继续）或 **report_agent**（结束）：条件路由
+7. **report_agent** → **END**：生成最终面试报告
+
+> 💡 **提示**：运行 `python backend/test_graph_visualization.py` 可在项目根目录生成最新的工作流可视化图
+
 ## 📂 项目结构
 
 ```
@@ -100,7 +117,6 @@ OPENAI_API_BASE=https://api.openai.com/v1
 MODEL_NAME=gpt-4
 
 # 面试配置
-MAX_ROUNDS=3
 TEMPERATURE=0.7
 
 # 数据库配置（可选，默认使用 SQLite）
@@ -119,9 +135,12 @@ python main.py
 
 ### 5. 可视化工作流（可选）
 ```bash
-# 生成工作流可视化图
+# 生成工作流可视化图（保存到项目根目录）
 python backend/test_graph_visualization.py
 ```
+
+生成的图片将保存到项目根目录：
+- `workflow_graph.png`：带标题的完整版工作流图
 
 ## 📖 使用说明
 

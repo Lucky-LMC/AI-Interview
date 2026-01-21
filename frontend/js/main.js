@@ -188,7 +188,7 @@ function clearInterviewState() {
 }
 
 // 添加消息到聊天区域
-function addMessage(type, content, isError = false) {
+function addMessage(type, content, isError = false, isHtml = false) {
     const messagesContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
@@ -206,6 +206,11 @@ function addMessage(type, content, isError = false) {
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
+    // 如果是文件卡片，添加特殊类以去除气泡样式
+    if (isHtml && content.includes('class="file-card"')) {
+        messageContent.classList.add('is-file');
+    }
+
     if (isError) {
         messageContent.style.borderLeft = '4px solid var(--error-color)';
     }
@@ -213,13 +218,19 @@ function addMessage(type, content, isError = false) {
     const messageText = document.createElement('div');
     messageText.className = 'message-text';
 
-    // 处理多行文本
-    const lines = content.split('\n');
-    lines.forEach(line => {
-        const p = document.createElement('p');
-        p.textContent = line;
-        messageText.appendChild(p);
-    });
+    if (isHtml) {
+        // 如果是 HTML 内容，直接设置 innerHTML
+        // 注意：调用方必须确保 content 是安全的（已转义）
+        messageText.innerHTML = content.replace(/\n/g, '<br>');
+    } else {
+        // 处理多行文本
+        const lines = content.split('\n');
+        lines.forEach(line => {
+            const p = document.createElement('p');
+            p.textContent = line;
+            messageText.appendChild(p);
+        });
+    }
 
     messageContent.appendChild(messageText);
 
@@ -319,25 +330,31 @@ function updateStreamingMessage(messageDiv, content) {
     }
 }
 
-// 处理上传简历（只在前端显示，不发送请求）
+// 处理上传简历（显示文件预览，不发送请求）
 function handleUploadResume(file) {
     if (!file) {
         showError('请选择文件');
         return;
     }
 
-    // 检查文件类型（支持 PDF 和 Word）
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
-    if (!validTypes.includes(file.type)) {
-        showError('只支持 PDF 或 Word 格式');
+    // 检查文件类型（只支持 PDF）
+    if (file.type !== 'application/pdf') {
+        showError('只支持 PDF 格式');
         return;
     }
 
     // 保存文件到待发送列表
     pendingFile = file;
 
-    // 在前端显示上传的文件
-    addMessage('user', `📎 上传文件：${file.name}`);
+    // 显示文件预览
+    const filePreview = document.getElementById('file-preview');
+    const previewFileName = document.getElementById('preview-file-name');
+    if (filePreview && previewFileName) {
+        previewFileName.textContent = file.name;
+        filePreview.classList.remove('hidden');
+    }
+
+    // 在聊天中提示
     addMessage('ai', '📄 文件已选择，点击发送按钮开始解析并开始面试。');
 }
 
@@ -364,8 +381,12 @@ async function handleStartInterview() {
         interviewState.currentRound = result.round;
         interviewState.isReadOnly = false;
 
-        // 清除待发送文件
+        // 清除待发送文件和隐藏文件预览
         pendingFile = null;
+        const filePreview = document.getElementById('file-preview');
+        if (filePreview) {
+            filePreview.classList.add('hidden');
+        }
 
         // 更新当前查看的ID
         currentViewingThreadId = result.thread_id;
@@ -376,9 +397,16 @@ async function handleStartInterview() {
         // 重新加载记录列表以更新高亮
         renderInterviewRecords();
 
-        // 显示解析的文档内容
+        // 在聊天中显示文件卡片（用户消息）
         if (result.resume_text) {
-            addMessage('ai', `✅ 文件解析成功！\n\n文件名：${fileName}\n\n解析内容：\n${result.resume_text}`);
+            // 对 resume_text 进行存储，用于点击查看
+            const escapedText = result.resume_text.replace(/"/g, '&quot;');
+
+            // 创建文件卡片 HTML (与预览一致的风格)
+            const fileCardHtml = `<div class="file-card" data-resume="${escapedText}"><span class="file-card-icon">📄</span><div class="file-card-info"><span class="file-card-name">${fileName}</span></div></div>`;
+
+            addMessage('user', fileCardHtml, false, true);
+            addMessage('ai', '✅ 文件解析成功！');
         }
 
         // 显示第一个问题
@@ -388,6 +416,75 @@ async function handleStartInterview() {
         showError(`开始面试失败：${error.message}`);
     }
 }
+
+// 显示简历模态框
+function showResumeModal(content) {
+    const modal = document.getElementById('resume-modal');
+    const modalBody = document.getElementById('resume-modal-body');
+    if (modal && modalBody) {
+        modalBody.textContent = content; // 使用 textContent 自动处理换行
+        modal.classList.remove('hidden');
+    }
+}
+
+// 隐藏简历模态框
+function hideResumeModal() {
+    const modal = document.getElementById('resume-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// 初始化模态框事件
+document.addEventListener('DOMContentLoaded', () => {
+    // 关闭按钮
+    const closeBtn = document.getElementById('close-resume-modal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideResumeModal);
+    }
+
+    // 点击模态框背景关闭
+    const modal = document.getElementById('resume-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideResumeModal();
+            }
+        });
+    }
+
+    // 移除文件按钮
+    const removeFileBtn = document.getElementById('remove-file-btn');
+    if (removeFileBtn) {
+        removeFileBtn.addEventListener('click', () => {
+            pendingFile = null;
+            const filePreview = document.getElementById('file-preview');
+            if (filePreview) {
+                filePreview.classList.add('hidden');
+            }
+        });
+    }
+
+    // 委托点击事件处理简历链接和文件卡片
+    document.addEventListener('click', (e) => {
+        // 处理简历链接
+        if (e.target.classList.contains('resume-link')) {
+            const content = e.target.getAttribute('data-resume');
+            if (content) {
+                showResumeModal(content);
+            }
+        }
+
+        // 处理文件卡片点击
+        const fileCard = e.target.closest('.file-card');
+        if (fileCard) {
+            const content = fileCard.getAttribute('data-resume');
+            if (content) {
+                showResumeModal(content);
+            }
+        }
+    });
+});
 
 // ============================================
 // ========== 流式输出处理函数 ==========

@@ -1,19 +1,16 @@
 ﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 简历解析节点
-使用 Agent + 工具自动解析文档（PDF/Word）
+直接使用 PDF 解析函数解析简历
 """
 import os
-from langchain_core.messages import AIMessage
 from backend.graph.state import InterviewState
-from backend.graph.agents import document_agent
+from backend.utils.pdf_parser import parse_pdf
 
 
 def parse_resume_node(state: InterviewState) -> InterviewState:
     """
-    简历解析节点：使用 Agent + 工具自动解析文档（PDF/Word）
-    
-    Agent 会根据文件扩展名自动选择合适的工具进行解析
+    简历解析节点：直接解析 PDF 格式简历
     """
     # 如果 resume_text 已经存在，直接返回
     if state.get('resume_text'):
@@ -29,35 +26,15 @@ def parse_resume_node(state: InterviewState) -> InterviewState:
         print(f"[parse_resume_node] 警告: 简历文件不存在: {resume_path}")
         return state
         
-    # 使用 Agent 解析文档
+    # 直接调用 PDF 解析函数
     try:
         print(f"[parse_resume_node] 开始解析: {resume_path}")
         
-        # 调用 Agent 解析
-        user_message = f"请解析这个文件：{resume_path}"
-        inputs = {
-            "messages": [
-                {"role": "user", "content": user_message}
-            ]
-        }
-        
-        # 使用全局实例化的 document_agent
-        result = document_agent.invoke(inputs)
-        
-        # 从 Agent 响应中提取文本内容
-        resume_text = ""
-        if result and "messages" in result:
-            messages = result["messages"]
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage):
-                    content = getattr(msg, "content", "")
-                    if isinstance(content, str) and content.strip():
-                        resume_text = content.strip()
-                        break
+        resume_text = parse_pdf(resume_path)
         
         # 检查解析结果
-        if not resume_text or resume_text.startswith("解析失败") or resume_text.startswith("错误"):
-            print(f"[parse_resume_node] Agent 返回无效结果: {resume_text}")
+        if not resume_text or resume_text.startswith("错误") or resume_text.startswith("警告"):
+            print(f"[parse_resume_node] 解析失败: {resume_text}")
             return state
         
         print(f"[parse_resume_node] 解析成功，文本长度: {len(resume_text)}")
@@ -68,5 +45,5 @@ def parse_resume_node(state: InterviewState) -> InterviewState:
         return new_state
             
     except Exception as e:
-        print(f"[parse_resume_node] 解析简历失败: {e}", exc_info=True)
+        print(f"[parse_resume_node] 解析简历失败: {e}")
         raise

@@ -28,21 +28,20 @@ def create_interview_graph():
     
     # ========== 添加节点 ==========
     # 每个节点对应一个业务功能，接收 state 并返回更新后的 state
-    # 使用 agent 名称，便于在可视化中展示使用了 agent
-    workflow.add_node("document_agent", parse_resume_node)      # 文档解析 Agent
-    workflow.add_node("interviewer_agent", ask_question_node)   # 面试官 Agent
-    workflow.add_node("answer", answer_node)                    # 用户回答节点
-    workflow.add_node("evaluator_agent", evaluate_node)        # 评价 Agent（生成反馈）
-    workflow.add_node("check_finish", check_finish_node)       # 检查是否完成所有轮次
-    workflow.add_node("report_agent", generate_report_node)     # 报告生成 Agent
+    workflow.add_node("parse_resume", parse_resume_node)          # 简历解析节点
+    workflow.add_node("interviewer_agent", ask_question_node)     # 面试官 Agent
+    workflow.add_node("answer", answer_node)                      # 用户回答节点
+    workflow.add_node("evaluator_agent", evaluate_node)           # 评价 Agent（生成反馈）
+    workflow.add_node("check_finish", check_finish_node)          # 检查是否完成所有轮次
+    workflow.add_node("report_agent", generate_report_node)       # 报告生成 Agent
         
 
     # ========== 添加固定边（确定性流转）==========
-    # START -> 文档解析 Agent，作为整个流程的起点
-    workflow.add_edge(START, "document_agent")
+    # START -> 简历解析节点，作为整个流程的起点
+    workflow.add_edge(START, "parse_resume")
 
-    # 文档解析 Agent -> 面试官 Agent
-    workflow.add_edge("document_agent", "interviewer_agent")
+    # 简历解析节点 -> 面试官 Agent
+    workflow.add_edge("parse_resume", "interviewer_agent")
 
     # 面试官 Agent -> 回答：出题后等待用户回答
     workflow.add_edge("interviewer_agent", "answer")
