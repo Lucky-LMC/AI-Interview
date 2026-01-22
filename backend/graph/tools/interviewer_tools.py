@@ -8,37 +8,80 @@ from backend.graph.llm import openai_llm
 
 
 @tool
-def search_interview_questions(position: str, question_type: str = "技术") -> str:
+def search_interview_questions(position: str) -> str:
     """
     根据岗位联网搜索面试题目。
     
     Args:
         position: 目标岗位名称，如"Java后端开发工程师"、"前端开发工程师"
-        question_type: 问题类型，可选值："技术"、"沟通"、"HR"
     
     Returns:
         搜索到的面试题目列表
     """
-    # TODO: 后续可接入真实搜索API（如Tavily、SerpAPI等）
-    # 目前使用 LLM 模拟搜索结果
-    
+    from backend.config import TAVILY_API_KEY
+    from tavily import TavilyClient
+
+    # 尝试使用 Tavily 进行真实搜索
+    if TAVILY_API_KEY:
+        try:
+            print(f"[search_interview_questions] 正在使用 Tavily 搜索: {position} 面试题")
+            tavily = TavilyClient(api_key=TAVILY_API_KEY)
+            
+            # 构建搜索查询
+            query = f"{position} 面试题 常见问题 2024 2025"
+            
+            # 执行搜索，获取包含内容的上下文
+            response = tavily.search(query=query, search_depth="advanced", max_results=3)
+            results = response.get("results", [])
+            
+            if results:
+                # 提取搜索结果内容
+                context_parts = []
+                for i, res in enumerate(results):
+                    context_parts.append(f"来源 {i+1}: {res['title']}\n{res['content']}")
+                
+                search_context = "\n\n".join(context_parts)
+                
+                # 使用 LLM 从搜索结果中提取并整理问题
+                prompt = f"""请根据以下联网搜索到的内容，整理出5个高质量的面试问题：
+
+岗位：{position}
+
+搜索结果：
+{search_context}
+
+请输出5个具体的面试问题，每个问题一行，只输出问题内容，不要编号。
+要求：
+1. 问题必须基于搜索结果
+2. 问题要真实、常见、有深度
+3. 涵盖技术、项目经验等不同维度
+"""
+                result = openai_llm.invoke(prompt)
+                questions = result.content.strip()
+                print(f"[search_interview_questions] Tavily 搜索并整理的问题:\n{questions}")
+                return f"【{position} - 面试题 (联网搜索)】\n{questions}"
+                
+        except Exception as e:
+            print(f"[search_interview_questions] Tavily 搜索失败，降级为 LLM 模拟: {e}")
+            # 失败后继续执行下方的 LLM 模拟逻辑
+
+    # 降级逻辑：使用 LLM 模拟搜索结果
     prompt = f"""你是一个面试题目搜索引擎。请根据以下信息，提供5个真实、常见的面试问题：
 
 岗位：{position}
-问题类型：{question_type}类问题
 
 请输出5个具体的面试问题，每个问题一行，只输出问题内容，不要编号。
 要求：
 1. 问题要真实、常见、有深度
 2. 针对该岗位的核心能力
-3. {question_type}类问题要符合该轮次的考察目标
+3. 涵盖技术、项目经验等不同维度
 """
     
     try:
         result = openai_llm.invoke(prompt)
         questions = result.content.strip()
-        print(f"[search_interview_questions] 搜索到的问题:\n{questions}")
-        return f"【{position} - {question_type}类面试题】\n{questions}"
+        print(f"[search_interview_questions] LLM 模拟搜索到的问题:\n{questions}")
+        return f"【{position} - 面试题】\n{questions}"
     except Exception as e:
         print(f"[search_interview_questions] 搜索失败: {e}")
         return f"搜索失败: {str(e)}"
@@ -80,6 +123,7 @@ def generate_from_resume(resume_text: str, focus_area: str = "") -> str:
     except Exception as e:
         print(f"[generate_from_resume] 生成失败: {e}")
         return f"生成失败: {str(e)}"
+
 
 
 # 导出工具列表

@@ -33,25 +33,20 @@ def ask_question_node(state: InterviewState) -> InterviewState:
             for i, h in enumerate(history)
         ]) if history else "无"
         
-        # 确定当前轮次的问题类型
-        question_types = {1: "技术", 2: "沟通", 3: "HR"}
-        question_type = question_types.get(round_num, "综合")
-        
         # 构建 Agent 输入消息
-        user_message = f"""请为以下候选人生成第 {round_num} 轮面试问题。
+        user_message = f"""当前面试进展：
 
-## 候选人信息
-- 目标岗位：{target_position}
-- 当前轮次：第 {round_num} 轮（{question_type}类问题）
+## 1. 基础信息
+- **轮次**: 第 {round_num} / 3 轮
+- **候选人岗位**: {target_position}
 
-## 简历摘要
+## 2. 候选人简历
 {resume_text}
 
-## 已提问的问题
+## 3. 历史问答记录
 {history_text}
 
-请使用你的工具获取候选问题，然后选择最合适的一个问题输出。
-注意：不要重复已提问的问题，直接输出最终选定的问题即可。
+请根据当前轮次提出下一个面试问题。
 """
         
         print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")

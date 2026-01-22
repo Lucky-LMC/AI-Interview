@@ -37,6 +37,10 @@ TEMPERATURE = float(get_required_env("TEMPERATURE"))
 # LangSmith API 密钥（用于追踪和调试）
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
 
+# ========== Tavily 配置 ==========
+# Tavily API 密钥
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+
 # ========== Gemini 配置 ==========
 # Gemini API 密钥
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
