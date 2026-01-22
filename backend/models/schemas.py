@@ -20,9 +20,11 @@ class SubmitAnswerRequest(BaseModel):
 class StartInterviewResponse(BaseModel):
     """启动面试响应"""
     thread_id: str = Field(..., description="会话ID")
-    resume_text: str = Field(..., description="解析出的简历内容")
+    resume_text: str = Field(..., description="LLM提取的简历关键信息")
+    target_position: str = Field(..., description="LLM提取的目标岗位")
     question: str = Field(..., description="第一个问题")
     round: int = Field(..., description="当前轮次")
+    resume_file_url: Optional[str] = Field(None, description="简历PDF文件访问URL")
 
 
 class InterviewStatusResponse(BaseModel):

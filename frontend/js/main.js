@@ -162,6 +162,7 @@ function getInterviewState() {
         currentRound: 1,
         maxRounds: 3,
         resumeText: '',
+        resumeFileUrl: null,
         lastFeedback: null,
         finalReport: null,
         isReadOnly: false
@@ -215,6 +216,7 @@ function addMessage(type, content, isError = false, isHtml = false) {
         messageContent.style.borderLeft = '4px solid var(--error-color)';
     }
 
+
     const messageText = document.createElement('div');
     messageText.className = 'message-text';
 
@@ -223,14 +225,24 @@ function addMessage(type, content, isError = false, isHtml = false) {
         // 注意：调用方必须确保 content 是安全的（已转义）
         messageText.innerHTML = content.replace(/\n/g, '<br>');
     } else {
-        // 处理多行文本
-        const lines = content.split('\n');
-        lines.forEach(line => {
-            const p = document.createElement('p');
-            p.textContent = line;
-            messageText.appendChild(p);
-        });
+        // 检测是否包含 Markdown 标记（###, **, -, 等）
+        const hasMarkdown = /###|##|\*\*|\n-\s|\n\d+\.\s/.test(content);
+
+        if (hasMarkdown && typeof marked !== 'undefined') {
+            // 使用 marked.js 渲染 Markdown
+            messageText.innerHTML = marked.parse(content);
+            messageText.classList.add('markdown-content');
+        } else {
+            // 处理纯文本多行
+            const lines = content.split('\n');
+            lines.forEach(line => {
+                const p = document.createElement('p');
+                p.textContent = line;
+                messageText.appendChild(p);
+            });
+        }
     }
+
 
     messageContent.appendChild(messageText);
 
@@ -377,6 +389,7 @@ async function handleStartInterview() {
         // 更新面试状态
         interviewState.threadId = result.thread_id;
         interviewState.resumeText = result.resume_text;
+        interviewState.resumeFileUrl = result.resume_file_url;  // 保存PDF文件URL
         interviewState.currentQuestion = result.question;
         interviewState.currentRound = result.round;
         interviewState.isReadOnly = false;
@@ -399,15 +412,20 @@ async function handleStartInterview() {
 
         // 在聊天中显示文件卡片（用户消息）
         if (result.resume_text) {
-            // 对 resume_text 进行存储，用于点击查看
+            // 对 resume_text 进行存储，用于点击查看纯文本（备用）
             const escapedText = result.resume_text.replace(/"/g, '&quot;');
 
-            // 创建文件卡片 HTML (与预览一致的风格)
-            const fileCardHtml = `<div class="file-card" data-resume="${escapedText}"><span class="file-card-icon">📄</span><div class="file-card-info"><span class="file-card-name">${fileName}</span></div></div>`;
+            // 创建文件卡片 HTML，添加 data-pdf-url 属性用于打开PDF预览
+            const pdfUrl = result.resume_file_url || '';
+            const fileCardHtml = `<div class="file-card" data-resume="${escapedText}" data-pdf-url="${pdfUrl}"><span class="file-card-icon">📄</span><div class="file-card-info"><span class="file-card-name">${fileName}</span></div></div>`;
 
             addMessage('user', fileCardHtml, false, true);
-            addMessage('ai', '✅ 文件解析成功！');
+            addMessage('ai', '✅ 文件解析成功！点击文件卡片可预览原始PDF。');
         }
+
+        // 显示目标岗位信息
+        const targetPosition = result.target_position || '未识别';
+        addMessage('ai', `🎯 **识别到的目标岗位**：${targetPosition}\n\n📋 **简历关键信息**：\n${result.resume_text}`);
 
         // 显示第一个问题
         addMessage('ai', `📊 面试开始！\n\n当前轮次：${result.round} / ${interviewState.maxRounds}\n\n❓ 问题：\n${result.question}`);
@@ -475,12 +493,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 处理文件卡片点击
+        // 处理文件卡片点击 - 优先打开PDF预览
         const fileCard = e.target.closest('.file-card');
         if (fileCard) {
-            const content = fileCard.getAttribute('data-resume');
-            if (content) {
-                showResumeModal(content);
+            const pdfUrl = fileCard.getAttribute('data-pdf-url');
+            if (pdfUrl) {
+                // 有PDF URL时，在新窗口打开PDF预览
+                window.open(pdfUrl, '_blank');
+            } else {
+                // 没有PDF URL时，回退到显示纯文本
+                const content = fileCard.getAttribute('data-resume');
+                if (content) {
+                    showResumeModal(content);
+                }
             }
         }
     });

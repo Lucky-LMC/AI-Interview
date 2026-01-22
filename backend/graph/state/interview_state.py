@@ -21,7 +21,8 @@ class InterviewState(TypedDict):
     
     # ========== 简历信息 ==========
     resume_path: str    # 简历 PDF 文件路径
-    resume_text: str    # 解析后的简历文本内容
+    resume_text: str    # LLM 提取的简历关键信息（结构化摘要）
+    target_position: str  # LLM 提取的目标岗位
     
     # ========== 面试记录 ==========
     # 存储所有轮次的问答记录

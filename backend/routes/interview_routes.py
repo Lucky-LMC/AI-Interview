@@ -9,7 +9,8 @@ import shutil
 import tempfile
 import json
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Header, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -25,6 +26,10 @@ from backend.config import SessionLocal
 from backend.models import InterviewRecord
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
+
+# PDF文件存储目录
+UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 
 def get_db():
@@ -48,24 +53,25 @@ async def start_interview(
     2. 保存文件并启动工作流：document_agent -> interviewer_agent -> [INTERRUPT before answer]
     3. 返回解析的文档内容和第一个问题
     """
-    temp_file_path = None
+    pdf_file_path = None
     try:
         # 1. 生成会话 ID
         thread_id = str(uuid.uuid4())
         
-        # 2. 临时保存文件
+        # 2. 保存PDF文件到持久化目录（用于后续预览）
         file_ext = os.path.splitext(file.filename)[1] or ".pdf"
-        temp_file_path = os.path.join(tempfile.gettempdir(), f"{thread_id}{file_ext}")
+        pdf_file_path = UPLOADS_DIR / f"{thread_id}{file_ext}"
         
-        with open(temp_file_path, "wb") as buffer:
+        with open(pdf_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
         # 3. 初始化状态
         initial_state: InterviewState = {
             "round": 0,
             "max_rounds": max_rounds,
-            "resume_path": temp_file_path,  # 临时文件路径
-            "resume_text": "",  # 将由 document_agent 解析
+            "resume_path": str(pdf_file_path),  # 持久化文件路径
+            "resume_text": "",  # 将由 LLM 提取关键信息
+            "target_position": "",  # 将由 LLM 提取目标岗位
             "history": [],
             "report": "",
             "is_finished": False
@@ -76,29 +82,49 @@ async def start_interview(
         config = {"configurable": {"thread_id": thread_id}}
         result = workflow.invoke(initial_state, config)
         
-        # 5. 清理临时文件（解析完成后）
-        if temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.remove(temp_file_path)
-            except:
-                pass
-        
-        # 6. 返回解析的文档内容和第一个问题（从 history 中获取）
+        # 5. 返回解析的文档内容、第一个问题和PDF访问URL
         history = result.get('history', [])
         question = history[-1].get('question', '') if history else ''
+        
+        # 构建PDF文件的访问URL
+        resume_file_url = f"/api/interview/resume/{thread_id}"
         
         return StartInterviewResponse(
             thread_id=thread_id,
             resume_text=result.get('resume_text', ''),
+            target_position=result.get('target_position', '未识别'),
             question=question,
-            round=result.get('round', 0) + 1
+            round=result.get('round', 0) + 1,
+            resume_file_url=resume_file_url
         )
     
     except Exception as e:
-        # 出错时也要清理临时文件
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        # 出错时清理已保存的文件
+        if pdf_file_path and pdf_file_path.exists():
+            pdf_file_path.unlink()
         raise HTTPException(status_code=500, detail=f"开始面试失败: {str(e)}")
+
+
+@router.get("/resume/{thread_id}")
+async def get_resume_pdf(thread_id: str):
+    """
+    获取简历PDF文件
+    用于在前端预览原始PDF文件
+    """
+    # 查找对应的PDF文件
+    pdf_file_path = UPLOADS_DIR / f"{thread_id}.pdf"
+    
+    if not pdf_file_path.exists():
+        raise HTTPException(status_code=404, detail="简历文件不存在")
+    
+    # 返回PDF文件（inline模式允许浏览器直接预览）
+    return FileResponse(
+        path=str(pdf_file_path),
+        media_type="application/pdf",
+        filename=f"resume_{thread_id}.pdf",
+        headers={"Content-Disposition": "inline"}  # inline表示在浏览器中预览
+    )
+
 
 # 非流式输出
 # @router.post("/submit", response_model=InterviewStatusResponse)
