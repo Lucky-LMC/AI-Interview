@@ -1,5 +1,5 @@
 /* AI模拟面试系统v1.0，作者刘梦畅 */
-/* 主页面样式 - 聊天式界面 */
+/* 主页面样�?- 聊天式界�?*/
 @import url('common.css');
 
 /* 主应用页面布局 */
@@ -346,6 +346,28 @@ body {
     max-width: 100%;
 }
 
+/* 思考气泡特殊样�?- 宽度自适应内容 */
+.ai-message .message-content.thinking-bubble {
+    max-width: fit-content !important;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+.ai-message .message-content.thinking-bubble .message-text {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    white-space: nowrap;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.ai-message .message-content.thinking-bubble .message-text * {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+}
+
 /* ========== 用户消息样式调整 (DeepSeek 风格) ========== */
 .user-message .message-content {
     background: #ffffff;
@@ -353,7 +375,7 @@ body {
     color: var(--text-primary);
     /* 文字颜色改为深色 */
     border: 1px solid #e5e5e5;
-    /* 添加细边框 */
+    /* 添加细边�?*/
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     margin-left: auto;
 }
@@ -371,7 +393,7 @@ body {
 }
 
 .message-text p {
-    margin: 0 0 8px 0;
+    margin: 0 0 4px 0;
 }
 
 .message-text p:last-child {
@@ -418,7 +440,7 @@ body {
     color: var(--text-primary);
 }
 
-/* 代码块样式 */
+/* 代码块样�?*/
 .message-code {
     background: #1e1e1e;
     color: #d4d4d4;
@@ -431,7 +453,7 @@ body {
     line-height: 1.5;
 }
 
-/* ========== 底部输入区 ========== */
+/* ========== 底部输入�?========== */
 .chat-input-container {
     position: fixed;
     bottom: 0;
@@ -537,7 +559,7 @@ body {
     margin-top: 8px;
 }
 
-/* 响应式设计 */
+/* 响应式设�?*/
 @media (max-width: 768px) {
     .sidebar {
         width: 100%;
@@ -638,7 +660,7 @@ body {
     font-family: inherit;
 }
 
-/* 简历链接样式 */
+/* 简历链接样�?*/
 .resume-link {
     color: var(--primary-color);
     cursor: pointer;
@@ -700,7 +722,7 @@ body {
     color: #ef4444;
 }
 
-/* ========== 聊天中的文件卡片样式 (与气泡一致) ========== */
+/* ========== 聊天中的文件卡片样式 (与气泡一�? ========== */
 .file-card {
     display: inline-flex;
     align-items: center;
@@ -748,7 +770,7 @@ body {
     line-height: 1.6;
 }
 
-/* ========== 纯文件消息样式（去除气泡包裹） ========== */
+/* ========== 纯文件消息样式（去除气泡包裹�?========== */
 .message-content.is-file {
     background: transparent !important;
     border: none !important;
@@ -796,18 +818,221 @@ body {
 }
 
 .markdown-content p {
-    margin: 8px 0;
+    margin: 4px 0;
     line-height: 1.6;
 }
 
 .markdown-content ul,
 .markdown-content ol {
-    margin: 8px 0;
+    margin: 4px 0;
     padding-left: 24px;
 }
 
 .markdown-content li {
+    margin: 0;
+    line-height: 1.6;
+}
+
+.markdown-content strong {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.markdown-content em {
+    font-style: italic;
+}
+
+.markdown-content code {
+    background: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    color: #e83e8c;
+}
+
+.markdown-content pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+}
+
+.markdown-content pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: 14px;
+}
+
+.markdown-content blockquote {
+    border-left: 4px solid var(--primary-color);
+    padding-left: 16px;
+    margin: 12px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.markdown-content hr {
+    border: none;
+    border-top: 1px solid #e5e5e5;
+    margin: 16px 0;
+}
+
+.markdown-content a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.markdown-content a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+.markdown-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+}
+
+.markdown-content th {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.markdown-content td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.file-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.file-remove-btn:hover {
+    color: #ef4444;
+}
+
+/* ========== 聊天中的文件卡片样式 (与气泡一�? ========== */
+.file-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #f0f4ff;
+    border: 1px solid #d0d9ff;
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.file-card:hover {
+    background-color: #e0eaff;
+    border-color: #b0c4ff;
+}
+
+.file-card-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.file-card-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    justify-content: center;
+}
+
+.file-card-name {
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-size: 14px !important;
+    line-height: 1.6;
+}
+
+/* ========== 纯文件消息样式（去除气泡包裹�?========== */
+.message-content.is-file {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.message-content.is-file .file-card {
+    margin: 0;
+}
+
+.file-card-size {
+    display: none;
+}
+
+/* ========== Markdown 内容样式 ========== */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.markdown-content h1 {
+    font-size: 24px;
+    border-bottom: 2px solid #e5e5e5;
+    padding-bottom: 8px;
+}
+
+.markdown-content h2 {
+    font-size: 20px;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 6px;
+}
+
+.markdown-content h3 {
+    font-size: 18px;
+}
+
+.markdown-content h4 {
+    font-size: 16px;
+}
+
+.markdown-content p {
     margin: 4px 0;
+    line-height: 1.6;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 4px 0;
+    padding-left: 24px;
+}
+
+.markdown-content li {
+    margin: 0;
     line-height: 1.6;
 }
 
@@ -887,3 +1112,35 @@ body {
     background: #f5f5f5;
     font-weight: 600;
 }
+
+/* ========== 思考中加载动画 ========== */
+.ai-message .message-content.thinking-bubble .thinking-text {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+.ai-message .message-content.thinking-bubble .thinking-dots::after {
+    content: '...';
+    display: inline-block;
+    animation: thinkingDots 1.5s infinite;
+    font-size: 14px !important;
+    font-weight: bold;
+    line-height: 1.6 !important;
+    color: var(--text-primary);
+    letter-spacing: 1px;
+}
+
+@keyframes thinkingDots {
+    0%, 20% {
+        content: '.  ';
+    }
+    40%, 60% {
+        content: '.. ';
+    }
+    80%, 100% {
+        content: '...';
+    }
+}
+

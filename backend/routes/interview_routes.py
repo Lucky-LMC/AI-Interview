@@ -13,13 +13,29 @@ from fastapi.responses import StreamingResponse, FileResponse
 from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Optional
+# AI智能面试辅助系统V1.0，作者刘梦畅
+"""
+路由层 - 面试相关的 API 路由
+基于 LangGraph 工作流的有状态设计
+"""
+import os
+import uuid
+import shutil
+import tempfile
+import json
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Header, Depends
+from fastapi.responses import StreamingResponse, FileResponse
+from pathlib import Path
+from sqlalchemy.orm import Session
+from typing import Optional
 
 from backend.graph.state import InterviewState
 from backend.models.schemas import (
     StartInterviewResponse,
     SubmitAnswerRequest,
     InterviewRecordListResponse,
-    InterviewRecordDetailResponse
+    InterviewRecordDetailResponse,
+    InterviewStatusResponse
 )
 from backend.graph.workflow import create_interview_graph
 from backend.config import SessionLocal
@@ -102,6 +118,9 @@ async def start_interview(
         # 出错时清理已保存的文件
         if pdf_file_path and pdf_file_path.exists():
             pdf_file_path.unlink()
+        import traceback
+        print(f"[start_interview] 发生异常: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"开始面试失败: {str(e)}")
 
 
@@ -127,93 +146,95 @@ async def get_resume_pdf(thread_id: str):
 
 
 # 非流式输出
-# @router.post("/submit", response_model=InterviewStatusResponse)
-# async def submit_answer(
-#     request: SubmitAnswerRequest,
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     第三阶段：提交回答
-#     处理用户回答，评分，并决定下一步
-#     """
-#     try:
-#         workflow = create_interview_graph()
-#         config = {"configurable": {"thread_id": request.thread_id}}
+@router.post("/submit", response_model=InterviewStatusResponse)
+async def submit_answer(
+    request: SubmitAnswerRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    第三阶段：提交回答
+    处理用户回答，评分，并决定下一步
+    """
+    try:
+        workflow = create_interview_graph()
+        config = {"configurable": {"thread_id": request.thread_id}}
         
-#         # 1. 获取当前状态，将用户回答更新到 history 的最后一条记录中
-#         current_state = workflow.get_state(config)
-#         if current_state.values:
-#             history = current_state.values.get('history', [])
-#             if history:
-#                 # 更新最后一条记录的答案
-#                 history[-1]['answer'] = request.answer
-#                 workflow.update_state(config, {"history": history})
+        # 1. 获取当前状态，将用户回答更新到 history 的最后一条记录中
+        current_state = workflow.get_state(config)
+        if current_state.values:
+            history = current_state.values.get('history', [])
+            if history:
+                # 更新最后一条记录的答案
+                history[-1]['answer'] = request.answer
+                workflow.update_state(config, {"history": history})
         
-#         # 2. 恢复工作流执行
-#         result = workflow.invoke(None, config)
+        # 2. 恢复工作流执行
+        result = workflow.invoke(None, config)
         
-#         # 3. 获取当前轮次的反馈（从 history 中获取最新的有反馈的记录）
-#         history = result.get('history', [])
-#         # 从后往前查找，找到有反馈的记录（因为如果未结束，最后一条可能是新问题）
-#         current_feedback = ''
-#         for entry in reversed(history):
-#             if entry.get('feedback'):
-#                 current_feedback = entry.get('feedback', '')
-#                 break
+        # 3. 获取当前轮次的反馈（从 history 中获取最新的有反馈的记录）
+        history = result.get('history', [])
+        # 从后往前查找，找到有反馈的记录（因为如果未结束，最后一条可能是新问题）
+        current_feedback = ''
+        for entry in reversed(history):
+            if entry.get('feedback'):
+                current_feedback = entry.get('feedback', '')
+                break
         
-#         # 4. 构建响应
-#         is_finished = result.get('is_finished', False)
+        # 4. 构建响应
+        is_finished = result.get('is_finished', False)
         
-#         response = InterviewStatusResponse(
-#             thread_id=request.thread_id,
-#             is_finished=is_finished,
-#             feedback=current_feedback,
-#             round=result.get('round', 0) + (0 if is_finished else 1)
-#         )
+        response = InterviewStatusResponse(
+            thread_id=request.thread_id,
+            is_finished=is_finished,
+            feedback=current_feedback,
+            round=result.get('round', 0) + (0 if is_finished else 1)
+        )
         
-#         if is_finished:
-#             response.report = result.get('report', '')
+        if is_finished:
+            response.report = result.get('report', '')
             
-#             # 面试完成时，保存面试记录到数据库
-#             try:
-#                 # 获取完整的面试数据
-#                 resume_text = result.get('resume_text', '')
-#                 history = result.get('history', [])
-#                 report = result.get('report', '')
+            # 面试完成时，保存面试记录到数据库
+            try:
+                # 获取完整的面试数据
+                resume_text = result.get('resume_text', '')
+                history = result.get('history', [])
+                report = result.get('report', '')
                 
-#                 # 创建新记录
-#                 new_record = InterviewRecord(
-#                     thread_id=request.thread_id,
-#                     user_name=request.user_name,
-#                     resume_text=resume_text,
-#                     history=history,
-#                     report=report
-#                     # created_at 创建面试记录表时，已经设置默认值为当前本地时间
-#                 )
-#                 db.add(new_record)
-#                 db.commit()
-#                 print(f"面试记录已保存: thread_id={request.thread_id}, user_name={request.user_name}")
-#             except Exception as e:
-#                 db.rollback()
-#                 print(f"保存面试记录失败: {e}")
-#         else:
-#             # 检查工作流状态，看是否在 interviewer_agent 后中断
-#             state_info = workflow.get_state(config)
-#             if state_info.next and "interviewer_agent" in state_info.next:
-#                 # 如果下一步是 interviewer_agent，说明还没生成新问题，需要继续执行
-#                 continue_result = workflow.invoke(None, config)
-#                 # 从 history 中获取新问题
-#                 continue_history = continue_result.get('history', [])
-#                 response.question = continue_history[-1].get('question', '') if continue_history else ''
-#             else:
-#                 # 从 history 中获取问题
-#                 result_history = result.get('history', [])
-#                 response.question = result_history[-1].get('question', '') if result_history else ''
+                # 创建新记录
+                new_record = InterviewRecord(
+                    thread_id=request.thread_id,
+                    user_name=request.user_name,
+                    resume_text=resume_text,
+                    history=history,
+                    report=report
+                    # created_at 创建面试记录表时，已经设置默认值为当前本地时间
+                )
+                db.add(new_record)
+                db.commit()
+                print(f"面试记录已保存: thread_id={request.thread_id}, user_name={request.user_name}")
+            except Exception as e:
+                db.rollback()
+                print(f"保存面试记录失败: {e}")
+        else:
+            # 检查工作流状态，看是否在 interviewer_agent 后中断
+            state_info = workflow.get_state(config)
+            if state_info.next and "interviewer_agent" in state_info.next:
+                # 如果下一步是 interviewer_agent，说明还没生成新问题，需要继续执行
+                continue_result = workflow.invoke(None, config)
+                # 从 history 中获取新问题
+                continue_history = continue_result.get('history', [])
+                response.question = continue_history[-1].get('question', '') if continue_history else ''
+            else:
+                # 从 history 中获取问题
+                result_history = result.get('history', [])
+                response.question = result_history[-1].get('question', '') if result_history else ''
             
-#         return response
-#     
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"提交回答失败: {str(e)}")
+        return response
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"提交回答失败: {str(e)}")
 
 
 @router.get("/records", response_model=InterviewRecordListResponse)
@@ -283,178 +304,142 @@ async def get_interview_record_detail(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取面试记录详情失败: {str(e)}")
 
-@router.post("/submit/stream")
-async def submit_answer_stream(
-    request: SubmitAnswerRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    【流式输出接口】提交用户答案并流式返回 AI 反馈
-    
-    核心技术：
-    1. SSE (Server-Sent Events) 协议：单向推送数据流
-    2. LangGraph 的 astream_events：监听工作流中每个节点的事件
-    3. 打字机效果：逐字符流式输出 LLM 生成的内容
-    
-    流程：
-    1. 更新用户答案到工作流状态
-    2. 恢复工作流执行（evaluator -> check_finish -> [interviewer/report]）
-    3. 监听工作流事件，实时推送 LLM 输出
-    4. 保存面试记录（如果面试结束）
-    """
-    async def generate_stream():
-        """
-        【异步生成器】生成 SSE 格式的数据流
-        
-        SSE 数据格式：
-        - 每条消息以 "data: " 开头
-        - 消息体是 JSON 字符串
-        - 每条消息以 "\n\n" 结尾（两个换行符）
-        
-        示例：
-        data: {"type": "feedback_start"}\n\n
-        data: {"type": "feedback", "content": "您"}\n\n
-        data: {"type": "feedback", "content": "的"}\n\n
-        data: {"type": "feedback", "content": "回答"}\n\n
-        """
-        try:
-            # ========== 步骤1：初始化工作流 ==========
-            workflow = create_interview_graph()
-            # 使用 thread_id 作为会话标识，LangGraph 会自动加载该会话的状态
-            config = {"configurable": {"thread_id": request.thread_id}}
-            
-            # ========== 步骤2：更新用户回答到工作流状态 ==========
-            # 获取当前会话的状态（包含 history、round、resume_text 等）
-            current_state = workflow.get_state(config)
-            if not current_state.values:
-                # 会话不存在，返回错误
-                yield f"data: {json.dumps({'error': '会话不存在'}, ensure_ascii=False)}\n\n"
-                return
-            
-            # 从状态中提取历史记录和简历文本
-            history = current_state.values.get('history', [])
-            resume_text = current_state.values.get('resume_text', '')
-            
-            # 将用户的回答更新到 history 的最后一条记录中
-            # history 结构：[{"question": "...", "answer": "...", "feedback": "..."}, ...]
-            if history:
-                history[-1]['answer'] = request.answer
-                # 更新工作流状态（只更新 history 字段）
-                workflow.update_state(config, {"history": history})
-            
-            # ========== 步骤3：使用 astream_events 执行工作流并监听事件 ==========
-            # astream_events 是 LangGraph 提供的异步事件流接口
-            # 它会在工作流执行过程中，实时推送各种事件（节点开始、LLM 输出、节点结束等）
-            current_node = None  # 记录当前正在执行的节点（evaluator/interviewer/report）
-            
-            # 异步迭代工作流事件流
-            # version="v2" 表示使用 LangGraph 的 v2 事件格式
-            async for event in workflow.astream_events(None, config, version="v2"):
-                event_type = event["event"]  # 事件类型（on_chain_start/on_chat_model_stream/on_chain_end）
-                event_name = event.get("name", "")  # 事件名称（包含节点名称）
-                
-                # ========== 监听节点开始事件 ==========
-                # 当某个节点（evaluator/interviewer/report）开始执行时触发
-                if event_type == "on_chain_start":
-                    # 判断是哪个节点开始执行
-                    if "evaluator" in event_name.lower():
-                        current_node = "evaluator"  # 评价节点
-                        # 推送"反馈开始"事件到前端
-                        yield f"data: {json.dumps({'type': 'feedback_start'}, ensure_ascii=False)}\n\n"
-                    elif "interviewer" in event_name.lower():
-                        current_node = "interviewer"  # 面试官节点
-                        # 推送"问题开始"事件到前端
-                        yield f"data: {json.dumps({'type': 'question_start'}, ensure_ascii=False)}\n\n"
-                    elif "report" in event_name.lower():
-                        current_node = "report"  # 报告节点
-                        # 推送"报告开始"事件到前端
-                        yield f"data: {json.dumps({'type': 'report_start'}, ensure_ascii=False)}\n\n"
-                
-                # ========== 监听 LLM 流式输出（打字机效果的核心！）==========
-                # 当 LLM 生成内容时，会逐个 token（字符）推送
-                # 这就是实现打字机效果的关键！
-                elif event_type == "on_chat_model_stream":
-                    # 从事件中提取 LLM 输出的 chunk（一小段文本，可能是一个字或几个字）
-                    chunk = event["data"]["chunk"]
-                    # 检查 chunk 是否包含内容
-                    if hasattr(chunk, 'content') and chunk.content:
-                        content = chunk.content  # 提取文本内容
-                        # 根据当前节点，推送不同类型的消息到前端
-                        if current_node == "evaluator":
-                            # 推送反馈内容（逐字符）
-                            yield f"data: {json.dumps({'type': 'feedback', 'content': content}, ensure_ascii=False)}\n\n"
-                        elif current_node == "interviewer":
-                            # 推送问题内容（逐字符）
-                            yield f"data: {json.dumps({'type': 'question', 'content': content}, ensure_ascii=False)}\n\n"
-                        elif current_node == "report":
-                            # 推送报告内容（逐字符）
-                            yield f"data: {json.dumps({'type': 'report', 'content': content}, ensure_ascii=False)}\n\n"
-                
-                # ========== 监听节点结束事件 ==========
-                # 当某个节点执行完成时触发
-                elif event_type == "on_chain_end":
-                    if current_node == "evaluator":
-                        # 推送"反馈结束"事件到前端
-                        yield f"data: {json.dumps({'type': 'feedback_end'}, ensure_ascii=False)}\n\n"
-                        current_node = None  # 清空当前节点
-                    elif current_node == "interviewer":
-                        # 推送"问题结束"事件到前端
-                        yield f"data: {json.dumps({'type': 'question_end'}, ensure_ascii=False)}\n\n"
-                        current_node = None
-                    elif current_node == "report":
-                        # 推送"报告结束"事件到前端
-                        yield f"data: {json.dumps({'type': 'report_end'}, ensure_ascii=False)}\n\n"
-                        current_node = None
-            
-            # ========== 步骤4：获取最终状态并处理 ==========
-            # 工作流执行完成后，获取最终状态
-            final_state = workflow.get_state(config)
-            is_finished = final_state.values.get('is_finished', False)  # 是否面试结束
-            round_num = final_state.values.get('round', 0)  # 当前轮次
-            
-            if is_finished:
-                # ========== 面试结束：保存面试记录到数据库 ==========
-                try:
-                    final_history = final_state.values.get('history', [])
-                    final_report = final_state.values.get('report', '')
-                    
-                    # 创建面试记录对象
-                    new_record = InterviewRecord(
-                        thread_id=request.thread_id,
-                        user_name=request.user_name,
-                        resume_text=resume_text,
-                        history=final_history,
-                        report=final_report
-                    )
-                    db.add(new_record)
-                    db.commit()
-                except Exception as e:
-                    db.rollback()
-                    print(f"保存面试记录失败: {e}")
-                
-                # 推送"面试结束"事件到前端
-                yield f"data: {json.dumps({'type': 'finished', 'round': round_num}, ensure_ascii=False)}\n\n"
-            else:
-                # ========== 面试继续：推送"继续下一轮"事件 ==========
-                yield f"data: {json.dumps({'type': 'continue', 'round': round_num + 1}, ensure_ascii=False)}\n\n"
-            
-            # ========== 步骤5：推送结束标记 ==========
-            # [DONE] 是 SSE 协议的约定，表示数据流结束
-            yield "data: [DONE]\n\n"
-            
-        except Exception as e:
-            # 发生错误时，推送错误消息到前端
-            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
-    
-    # ========== 返回 StreamingResponse ==========
-    # StreamingResponse 是 FastAPI 提供的流式响应类
-    # media_type="text/event-stream" 表示使用 SSE 协议
-    return StreamingResponse(
-        generate_stream(),  # 传入异步生成器
-        media_type="text/event-stream",  # SSE 协议的 MIME 类型
-        headers={
-            "Cache-Control": "no-cache",  # 禁用缓存（确保实时推送）
-            "Connection": "keep-alive",  # 保持连接（SSE 需要长连接）
-            "X-Accel-Buffering": "no"  # 禁用 nginx 缓冲（如果使用 nginx 反向代理）
-        }
-    )
+# @router.post("/submit/stream")
+# async def submit_answer_stream(
+#     request: SubmitAnswerRequest,
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     【流式输出接口】提交用户答案并流式返回 AI 反馈
+#     
+#     核心技术：
+#     1. SSE (Server-Sent Events) 协议：单向推送数据流
+#     2. LangGraph 的 astream_events：监听工作流中每个节点的事件
+#     3. 打字机效果：逐字符流式输出 LLM 生成的内容
+#     
+#     流程：
+#     1. 更新用户答案到工作流状态
+#     2. 恢复工作流执行（evaluator -> check_finish -> [interviewer/report]）
+#     3. 监听工作流事件，实时推送 LLM 输出
+#     4. 保存面试记录（如果面试结束）
+#     """
+#     async def generate_stream():
+#         """
+#         【异步生成器】生成 SSE 格式的数据流
+#         
+#         SSE 数据格式：
+#         - 每条消息以 "data: " 开头
+#         - 消息体是 JSON 字符串
+#         - 每条消息以 "\n\n" 结尾（两个换行符）
+#         
+#         示例：
+#         data: {"type": "feedback_start"}\n\n
+#         data: {"type": "feedback", "content": "您"}\n\n
+#         data: {"type": "feedback", "content": "的"}\n\n
+#         data: {"type": "feedback", "content": "回答"}\n\n
+#         """
+#         try:
+#             # ========== 步骤1：初始化工作流 ==========
+#             workflow = create_interview_graph()
+#             config = {"configurable": {"thread_id": request.thread_id}}
+#             
+#             # ========== 步骤2：更新用户回答到工作流状态 ==========
+#             current_state = workflow.get_state(config)
+#             if not current_state.values:
+#                 yield f"data: {json.dumps({'error': '会话不存在'}, ensure_ascii=False)}\n\n"
+#                 return
+#             
+#             history = current_state.values.get('history', [])
+#             resume_text = current_state.values.get('resume_text', '')
+#             
+#             if history:
+#                 history[-1]['answer'] = request.answer
+#                 workflow.update_state(config, {"history": history})
+#             
+#             # ========== 步骤3：执行工作流 (非流式执行) ==========
+#             # 直接等待工作流执行完成，获取最终结果
+#             result = await workflow.ainvoke(None, config)
+#             
+#             # ========== 步骤4：处理执行结果并推送 ==========
+#             
+#             # 4.1 获取反馈 (Evaluator 生成的)
+#             # 反馈通常在 history 的倒数第二条（如果是新的一轮）或者最后一条（如果结束了）
+#             # 我们遍历 history 找到最新的 feedback
+#             result_history = result.get('history', [])
+#             latest_feedback = ""
+#             if result_history:
+#                 # 从后往前找有 feedback 的记录
+#                 for entry in reversed(result_history):
+#                     if entry.get('feedback'):
+#                         latest_feedback = entry.get('feedback')
+#                         break
+#             
+#             if latest_feedback:
+#                 yield f"data: {json.dumps({'type': 'feedback_start'}, ensure_ascii=False)}\n\n"
+#                 yield f"data: {json.dumps({'type': 'feedback', 'content': latest_feedback}, ensure_ascii=False)}\n\n"
+#                 yield f"data: {json.dumps({'type': 'feedback_end'}, ensure_ascii=False)}\n\n"
+#             
+#             # 4.2 检查是否结束
+#             is_finished = result.get('is_finished', False)
+#             round_num = result.get('round', 0)
+#             
+#             if is_finished:
+#                 # ========== 面试结束 ==========
+#                 final_report = result.get('report', '')
+#                 
+#                 # 推送报告
+#                 yield f"data: {json.dumps({'type': 'report_start'}, ensure_ascii=False)}\n\n"
+#                 yield f"data: {json.dumps({'type': 'report', 'content': final_report}, ensure_ascii=False)}\n\n"
+#                 yield f"data: {json.dumps({'type': 'report_end'}, ensure_ascii=False)}\n\n"
+#                 
+#                 # 保存记录
+#                 try:
+#                     new_record = InterviewRecord(
+#                         thread_id=request.thread_id,
+#                         user_name=request.user_name,
+#                         resume_text=resume_text,
+#                         history=result_history,
+#                         report=final_report
+#                     )
+#                     db.add(new_record)
+#                     db.commit()
+#                 except Exception as e:
+#                     db.rollback()
+#                     print(f"保存面试记录失败: {e}")
+#                 
+#                 yield f"data: {json.dumps({'type': 'finished', 'round': round_num}, ensure_ascii=False)}\n\n"
+#                 
+#             else:
+#                 # ========== 面试继续 ==========
+#                 # 获取新生成的问题
+#                 latest_question = ""
+#                 if result_history:
+#                     latest_question = result_history[-1].get('question', '')
+#                 
+#                 if latest_question:
+#                     yield f"data: {json.dumps({'type': 'question_start'}, ensure_ascii=False)}\n\n"
+#                     yield f"data: {json.dumps({'type': 'question', 'content': latest_question}, ensure_ascii=False)}\n\n"
+#                     yield f"data: {json.dumps({'type': 'question_end'}, ensure_ascii=False)}\n\n"
+#                 
+#                 yield f"data: {json.dumps({'type': 'continue', 'round': round_num + 1}, ensure_ascii=False)}\n\n"
+#             
+#             # ========== 步骤5：推送结束标记 ==========
+#             yield "data: [DONE]\n\n"
+#             
+#         except Exception as e:
+#             import traceback
+#             traceback.print_exc()
+#             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+#     
+#     # ========== 返回 StreamingResponse ==========
+#     # StreamingResponse 是 FastAPI 提供的流式响应类
+#     # media_type="text/event-stream" 表示使用 SSE 协议
+#     return StreamingResponse(
+#         generate_stream(),  # 传入异步生成器
+#         media_type="text/event-stream",  # SSE 协议的 MIME 类型
+#         headers={
+#             "Cache-Control": "no-cache",  # 禁用缓存（确保实时推送）
+#             "Connection": "keep-alive",  # 保持连接（SSE 需要长连接）
+#             "X-Accel-Buffering": "no"  # 禁用 nginx 缓冲（如果使用 nginx 反向代理）
+#         }
+#     )

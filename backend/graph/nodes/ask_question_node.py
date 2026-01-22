@@ -1,71 +1,83 @@
 ﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 出题节点
-直接使用 LLM 智能生成问题
+使用面试官 Agent（带工具）智能生成问题
 """
 from backend.graph.state import InterviewState
-from backend.graph.llm import gemini_llm
+from backend.graph.agents import interviewer_agent
 
-# 系统提示词
-INTERVIEWER_SYSTEM_PROMPT = """你是一位经验丰富的面试官。
 
-你的任务是进行三轮面试，每轮提出一个有针对性的面试问题。
-
-面试安排：
-- 第1轮：通常为技术类问题，考察候选人的技术能力和项目经验
-- 第2轮：通常为沟通类问题，考察候选人的沟通能力、团队协作能力
-- 第3轮：通常为HR类问题，考察候选人的职业规划、工作态度等
-
-要求：
-1. 问题要有针对性，结合简历中的项目经验或技能
-2. 难度适中，既考察技术深度又考察实践能力
-3. 不要重复之前的问题
-4. 根据轮次和候选人的回答情况，灵活选择问题类型
-5. 直接输出问题，不要其他内容"""
 
 
 def ask_question_node(state: InterviewState) -> InterviewState:
     """
-    出题节点：直接使用 LLM 智能生成问题
+    出题节点：使用面试官 Agent 智能生成问题
+    
+    Agent 会根据情况选择：
+    1. 联网搜索该岗位的面试题
+    2. 根据简历生成针对性问题
     """
     resume_text = state.get('resume_text', '')
+    target_position = state.get('target_position', '未知岗位')
     history = state.get('history', [])
     round_num = state.get('round', 0) + 1
     
     if not resume_text:
-        print(f"警告: 没有可用的简历文本用于问题生成 (round={round_num}, history_len={len(history)})")
+        print(f"[ask_question_node] 警告: 没有可用的简历文本 (round={round_num})")
         return state
     
-    # 直接使用 LLM 生成问题
     try:
-        llm = gemini_llm
-        
         # 构建历史问题文本
         history_text = "\n".join([
             f"{i+1}. {h.get('question', '')}" 
             for i, h in enumerate(history)
         ]) if history else "无"
         
-        # 构建用户消息
-        user_message = f"""简历信息：
+        # 确定当前轮次的问题类型
+        question_types = {1: "技术", 2: "沟通", 3: "HR"}
+        question_type = question_types.get(round_num, "综合")
+        
+        # 构建 Agent 输入消息
+        user_message = f"""请为以下候选人生成第 {round_num} 轮面试问题。
+
+## 候选人信息
+- 目标岗位：{target_position}
+- 当前轮次：第 {round_num} 轮（{question_type}类问题）
+
+## 简历摘要
 {resume_text}
 
-已提问的问题：
+## 已提问的问题
 {history_text}
 
-请根据简历内容、已提问问题和面试轮次，提出第 {round_num} 个面试问题。"""
+请使用你的工具获取候选问题，然后选择最合适的一个问题输出。
+注意：不要重复已提问的问题，直接输出最终选定的问题即可。
+"""
         
-        # 构建消息列表
-        messages = [
-            {"role": "system", "content": INTERVIEWER_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ]
+        print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")
         
-        # 调用 LLM
-        result = llm.invoke(messages)
-        question = result.content.strip()
+        # 调用 Agent
+        agent_input = {"messages": [{"role": "user", "content": user_message}]}
+        result = interviewer_agent.invoke(agent_input)
         
-        print(f"[ask_question_node] 生成问题: {question}")
+        # 从 Agent 输出中提取最终问题
+        # Agent 的输出格式是 {"messages": [...]}
+        messages = result.get("messages", [])
+        question = ""
+        
+        # 获取最后一条 AI 消息作为问题
+        for msg in reversed(messages):
+            if hasattr(msg, 'content') and msg.content:
+                # 跳过工具调用消息
+                if not hasattr(msg, 'tool_calls') or not msg.tool_calls:
+                    question = msg.content.strip()
+                    break
+        
+        if not question:
+            # 如果没有获取到问题，使用备用逻辑
+            question = f"请介绍一下你在{target_position}相关领域的工作经验和技能。"
+        
+        print(f"[ask_question_node] 生成的问题: {question}")
         
         # 将问题添加到历史记录
         history_entry = {
@@ -83,5 +95,21 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         return new_state
             
     except Exception as e:
-        print(f"[ask_question_node] 生成问题失败: {e}", exc_info=True)
-        raise
+        import traceback
+        print(f"[ask_question_node] Agent 调用失败: {e}")
+        print(traceback.format_exc())
+        # 降级处理：使用简单问题
+        fallback_question = f"请介绍一下你最擅长的技术领域，并举例说明在项目中的应用。"
+        
+        history_entry = {
+            "question": fallback_question,
+            "answer": "",
+            "feedback": ""
+        }
+        
+        new_history = state.get('history', []).copy()
+        new_history.append(history_entry)
+        
+        new_state = state.copy()
+        new_state['history'] = new_history
+        return new_state
