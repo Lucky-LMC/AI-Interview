@@ -97,9 +97,6 @@ Interview/
 # 克隆项目
 git clone https://github.com/Lucky-LMC/AI-Interview.git
 
-# 进入目录
-cd AI-Interview
-
 # 创建虚拟环境（推荐）
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
