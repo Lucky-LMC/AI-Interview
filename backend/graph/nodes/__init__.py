@@ -3,6 +3,7 @@ from .ask_question_node import ask_question_node
 from .answer_node import answer_node
 from .evaluate_node import evaluate_node
 from .check_finish_node import check_finish_node
+from .search_resources_node import search_resources_node
 from .generate_report_node import generate_report_node
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "answer_node",
     "evaluate_node",
     "check_finish_node",
+    "search_resources_node",
     "generate_report_node"
 ]
