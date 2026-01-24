@@ -31,7 +31,7 @@
 
 系统采用 LangGraph 工作流引擎，实现了完整的面试流程自动化：
 
-![工作流架构图](workflow_graph1.png)
+<img src="workflow_graph1.png" alt="工作流架构图" width="600" />
 
 **工作流说明**：
 1. **START** → **parse_resume**（简历解析节点）：解析 PDF 格式简历

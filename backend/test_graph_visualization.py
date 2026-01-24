@@ -46,7 +46,7 @@ if __name__ == "__main__":
     
     # 保存图片到项目根目录
     output_path = project_root / "workflow_graph.png"
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=100, bbox_inches='tight', facecolor='white')
     print(f"✅ 工作流图已保存到项目根目录: {output_path}")
     
     # 显示图片（可选）
