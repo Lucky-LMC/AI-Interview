@@ -32,7 +32,7 @@
 系统采用 LangGraph 工作流引擎，实现了完整的面试流程自动化：
 
 <div align="center">
-    <img src="workflow_graph.png" alt="工作流架构图" width="600" />
+    <img src="workflow_graph.png" alt="工作流架构图" width="350" />
 </div>
 
 **工作流说明**：
