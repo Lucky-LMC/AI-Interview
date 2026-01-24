@@ -26,6 +26,10 @@ git push origin main
 ## 🚀 完整流程（推荐）
 
 ```bash
+# === 一键执行（PowerShell通用版）===
+git pull origin main; git add .; git commit -m "更新代码"; git push origin main
+
+# === 分步执行 ===
 # 先拉取最新代码（避免冲突）
 git pull origin main
 
