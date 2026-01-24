@@ -3,6 +3,7 @@
 出题节点
 使用面试官 Agent（带工具）智能生成问题
 """
+from langchain_core.messages import HumanMessage
 from backend.graph.state import InterviewState
 from backend.graph.agents import interviewer_agent
 
@@ -52,7 +53,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")
         
         # 调用 Agent
-        agent_input = {"messages": [{"role": "user", "content": user_message}]}
+        agent_input = {"messages": [HumanMessage(content=user_message)]}
         result = interviewer_agent.invoke(agent_input)
         
         # 从 Agent 输出中提取最终问题

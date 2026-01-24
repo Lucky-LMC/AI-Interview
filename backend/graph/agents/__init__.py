@@ -7,9 +7,18 @@ from backend.graph.agents.interviewer_agent import (
     interviewer_agent,
     INTERVIEWER_AGENT_PROMPT
 )
+from backend.graph.agents.coach_agent import (
+    create_coach_agent,
+    coach_agent,
+    COACH_AGENT_PROMPT
+)
 
 __all__ = [
     "create_interviewer_agent",
     "interviewer_agent",
-    "INTERVIEWER_AGENT_PROMPT"
+    "INTERVIEWER_AGENT_PROMPT",
+    "create_coach_agent",
+    "coach_agent",
+    "COACH_AGENT_PROMPT"
 ]
+
