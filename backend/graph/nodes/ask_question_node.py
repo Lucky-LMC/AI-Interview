@@ -48,6 +48,11 @@ def ask_question_node(state: InterviewState) -> InterviewState:
 {history_text}
 
 请根据当前轮次提出下一个面试问题。
+**注意**：你必须结合候选人的简历（特别是项目经历）来提问。
+**例如**：不要直接问 "什么是 Redis 分布式锁"，而要问 "你在 xx 项目中是如何使用 Redis 实现分布式锁的？"
+不要问纯粹的概念定义题。
+
+**注意**：你是面试官，请直接向候选人提问。不要复述简历或历史记录。
 """
         
         print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")
