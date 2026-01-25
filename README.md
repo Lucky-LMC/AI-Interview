@@ -48,8 +48,8 @@
 6. **check_finish** → **interviewer_agent**（继续）或 **search_resources**（结束）：条件路由
 7. **search_resources** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
 8. **generate_report** → **END**：流程结束
-```
-Intervie示**：运行 `python backend/test_ization.在项目根目录生成最新的工作流可视化图
+
+> 💡 **提示**：运行 `python backend/test_graph_visualization.py` 可在项目根目录生成最新的工作流可视化图
 
 ## 📂 项目结构
 
