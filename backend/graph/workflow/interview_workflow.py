@@ -34,7 +34,7 @@ def create_interview_graph():
     workflow.add_node("interviewer_agent", ask_question_node)        # 面试官 Agent
     workflow.add_node("answer", answer_node)                         # 用户回答节点
     workflow.add_node("check_finish", check_finish_node)             # 检查是否完成所有轮次
-    workflow.add_node("coach_node", coach_node)                      # 搜索学习资源节点（Coach Agent）
+    workflow.add_node("coach_agent", coach_node)                     # 搜索学习资源节点（Coach Agent）
     workflow.add_node("generate_report", generate_report_node)       # 生成最终报告节点
         
 
@@ -59,12 +59,12 @@ def create_interview_graph():
         lambda state: "finish" if state['is_finished'] else "continue",
         {
             "continue": "interviewer_agent",    # 未完成 -> 继续下一轮出题（面试官 Agent）
-            "finish": "coach_node"              # 已完成 -> 搜索学习资源（Coach Agent）
+            "finish": "coach_agent"              # 已完成 -> 搜索学习资源（Coach Agent）
         }
     )
 
     # 搜索资源 -> 生成报告
-    workflow.add_edge("coach_node", "generate_report")
+    workflow.add_edge("coach_agent", "generate_report")
     
     # 生成报告 -> END，作为整个流程的终点
     workflow.add_edge("generate_report", END)
