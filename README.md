@@ -2,16 +2,16 @@
 
 > 作者：刘梦畅
 
-这是一个基于大语言模型（LLM）和 LangGraph 工作流引擎开发的智能模拟面试系统。它能够模拟真实的面试场景，通过简历解析、针对性提问、实时评估和智能资源推荐，帮助求职者全面提升面试表现。
+这是一个基于大语言模型（LLM）和 LangGraph 工作流引擎开发的智能模拟面试系统。它能够模拟真实的面试场景，通过简历解析、针对性提问和智能资源推荐，帮助求职者全面提升面试表现。
 
 ## ✨ 项目亮点
 
 - **🔄 LangGraph 工作流架构**：采用专业的 Agent 工作流设计，实现从简历解析到报告生成的完整面试逻辑
 - **📊 工作流可视化**：支持生成工作流结构图，清晰展示节点间的流转关系
-- **🤖 多 Agent 协作**：面试官 Agent、评价 Agent、教练 Agent 分工明确，各司其职
+- **🤖 多 Agent 协作**：面试官 Agent、教练 Agent 分工明确，各司其职
 - **🔍 智能资源推荐**：基于 Tavily 搜索引擎，自动搜索并推荐真实的学习资源（书籍/课程/文档）
-- **💬 交互式面试**：支持多轮问答，AI 根据回答动态调整问题难度
-- **📝 专业评估报告**：面试结束后自动生成包含优势分析、不足改进、简历优化的完整报告
+- **💬 交互式面试**：支持多轮问答，基于简历项目经验提出针对性问题
+- **📝 完整面试报告**：面试结束后自动生成包含优势分析、不足改进、简历优化的完整报告
 - **🎨 现代化界面**：简洁美观的前端设计，支持 Markdown 渲染和 PDF 预览
 - **💾 数据持久化**：MySQL 数据库存储面试记录，支持历史记录查询
 
@@ -36,18 +36,17 @@
 系统采用 LangGraph 工作流引擎，实现了完整的面试流程自动化：
 
 <div align="center">
-    <img src="workflow_graph1.png" alt="AI智能面试工作流程图" width="350" />
+    <img src="workflow_graph.png" alt="AI智能面试工作流程图" width="400" />
 </div>
 
 **工作流说明**：
 1. **START** → **parse_resume**（简历解析节点）：解析 PDF/Word 格式简历，提取关键信息
 2. **parse_resume** → **interviewer_agent**（面试官 Agent）：基于简历生成针对性问题
 3. **interviewer_agent** → **answer**（用户回答节点）：等待用户输入答案（中断点）
-4. **answer** → **evaluator_agent**（评价 Agent）：对用户回答进行评分和反馈
-5. **evaluator_agent** → **check_finish**（检查完成节点）：判断是否完成所有轮次
-6. **check_finish** → **interviewer_agent**（继续）或 **search_resources**（结束）：条件路由
-7. **search_resources** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
-8. **generate_report** → **END**：流程结束
+4. **answer** → **check_finish**（检查完成节点）：判断是否完成所有轮次
+5. **check_finish** → **interviewer_agent**（继续）或 **coach_agent**（结束）：条件路由
+6. **coach_agent** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
+7. **generate_report** → **END**：流程结束
 
 > 💡 **提示**：运行 `python backend/test_graph_visualization.py` 可在项目根目录生成最新的工作流可视化图
 
@@ -68,10 +67,9 @@ Interview/
 │   │   ├── nodes/            # 工作流节点
 │   │   │   ├── parse_resume_node.py      # 简历解析节点
 │   │   │   ├── ask_question_node.py      # 出题节点
-│   │   │   ├── answer_node.py            # 回答节点
-│   │   │   ├── evaluate_node.py          # 评价节点
+│   │   │   ├── answer_node.py            # 回答节点（中断点）
 │   │   │   ├── check_finish_node.py      # 检查完成节点
-│   │   │   ├── search_resources_node.py  # 搜索资源节点
+│   │   │   ├── coach_node.py             # 搜索资源节点
 │   │   │   ├── generate_report_node.py   # 报告生成节点
 │   │   │   └── __init__.py
 │   │   ├── tools/            # 工具函数
@@ -236,7 +234,7 @@ python backend/test_graph_visualization.py
 - 系统会自动解析简历并生成第一个问题
 - 在输入框中输入你的回答
 - 点击"提交回答"或按 Ctrl+Enter 发送
-- AI 会对你的回答进行评价并提出下一个问题
+- 系统会继续提出下一个问题
 - 重复此过程直到完成所有轮次
 
 ### 4. 查看报告
@@ -256,35 +254,30 @@ python backend/test_graph_visualization.py
 ## 🎯 核心功能
 
 ### 1. 智能简历解析
-- 支持 PDF 和 Word 文档
+- 支持 PDF 文档
 - 自动提取关键信息（姓名、技能、项目经验等）
 - 识别目标岗位
 
 ### 2. 动态问题生成（Interviewer Agent）
 - 基于简历内容生成针对性问题
-- 三轮面试：技术类、沟通类、HR类
+- 结合项目经验提问，避免纯概念题
+- 三轮面试，逐步深入
 - 避免重复提问
-- 根据回答质量调整问题难度
 
-### 3. 实时评价反馈（Evaluator Agent）
-- 对每个回答进行评分
-- 指出回答的优点和不足
-- 给出改进建议
-
-### 4. 智能资源推荐（Coach Agent）
+### 3. 智能资源推荐（Coach Agent）
 - 自动分析面试表现中的薄弱点
 - **联网搜索**最新的学习资料（书籍/课程/文档）
 - 推荐真实可访问的资源链接
-- 避免信息过载，精选高质量资源
+- 精选高质量资源
 
-### 5. 完整面试报告
+### 4. 完整面试报告
 - 整体表现总结
 - 优势与不足分析
 - 学习资源推荐（附带链接）
 - 简历优化建议
 - 录用建议
 
-### 6. 数据持久化
+### 5. 数据持久化
 - MySQL 数据库存储用户信息和面试记录
 - 支持历史记录查询
 - 支持简历文件预览
@@ -301,9 +294,9 @@ python backend/test_graph_visualization.py
 ### 两节点报告生成架构
 为了确保 Agent 可靠地调用搜索工具，采用了两节点设计：
 
-1. **search_resources_node**（搜索资源节点）
+1. **coach_node**（搜索资源节点）
    - 职责：调用 Coach Agent 搜索学习资源
-   - 输入：简历 + 面试问答记录（简短版）
+   - 输入：面试问答记录（简短版）
    - 输出：搜索结果存入 `state['learning_resources']`
    - 优势：输入简短，任务明确，Agent 必定调用工具
 
