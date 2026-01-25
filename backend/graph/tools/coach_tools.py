@@ -28,11 +28,11 @@ def search_learning_resources(topic: str) -> str:
         print(f"[search_learning_resources] 正在搜索: {topic} 学习资源")
         tavily = TavilyClient(api_key=TAVILY_API_KEY)
         
-        # 构建搜索查询 - 搜索学习资源
-        query = f"{topic} 学习教程 书籍推荐 在线课程"
+        # 直接使用此 Topic 进行搜索
+        query = topic
         
         # 执行搜索
-        response = tavily.search(query=query, search_depth="advanced", max_results=5)
+        response = tavily.search(query=query, search_depth="advanced", max_results=2)
         results = response.get("results", [])
         
         if results:

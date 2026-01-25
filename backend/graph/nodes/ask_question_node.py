@@ -30,7 +30,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
     try:
         # 构建历史问题文本
         history_text = "\n".join([
-            f"{i+1}. {h.get('question', '')}" 
+            f"{i+1}. 问: {h.get('question', '')}\n   答: {h.get('answer', '（未回答）')}"
             for i, h in enumerate(history)
         ]) if history else "无"
         
@@ -83,8 +83,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         # 将问题添加到历史记录
         history_entry = {
             "question": question,
-            "answer": "",
-            "feedback": ""
+            "answer": ""
         }
         
         new_history = state.get('history', []).copy()
@@ -93,6 +92,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         # 更新状态
         new_state = state.copy()
         new_state['history'] = new_history
+        new_state['round'] = round_num
         return new_state
             
     except Exception as e:
@@ -103,14 +103,15 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         fallback_question = f"请介绍一下你最擅长的技术领域，并举例说明在项目中的应用。"
         
         history_entry = {
-            "question": fallback_question,
-            "answer": "",
-            "feedback": ""
+            "question": question,
+            "answer": ""
         }
         
         new_history = state.get('history', []).copy()
         new_history.append(history_entry)
         
+        # 更新状态
         new_state = state.copy()
         new_state['history'] = new_history
+        new_state['round'] = round_num
         return new_state

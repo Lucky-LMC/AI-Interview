@@ -26,8 +26,8 @@ class InterviewState(TypedDict):
     
     # ========== 面试记录 ==========
     # 存储所有轮次的问答记录
-    # 每条记录包含：问题、回答、反馈（包含评价和改进建议）
-    history: List[Dict[str, str]]  # [{"question": "", "answer": "", "feedback": ""}]
+    # 每条记录包含：问题、回答
+    history: List[Dict[str, str]]  # [{"question": "", "answer": ""}]
     
     # ========== 学习资源 ==========
     learning_resources: str  # Coach Agent 搜索到的学习资源

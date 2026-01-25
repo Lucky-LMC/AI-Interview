@@ -32,7 +32,6 @@ class InterviewStatusResponse(BaseModel):
     thread_id: str = Field(..., description="会话ID")
     is_finished: bool = Field(..., description="是否结束")
     question: Optional[str] = Field(None, description="新问题（如果未结束）")
-    feedback: Optional[str] = Field(None, description="上一轮反馈")
     report: Optional[str] = Field(None, description="最终报告（如果已结束）")
     round: int = Field(..., description="当前轮次")
 

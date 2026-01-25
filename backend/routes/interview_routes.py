@@ -110,7 +110,7 @@ async def start_interview(
             resume_text=result.get('resume_text', ''),
             target_position=result.get('target_position', '未识别'),
             question=question,
-            round=result.get('round', 0) + 1,
+            round=result.get('round', 0),
             resume_file_url=resume_file_url
         )
     
@@ -171,23 +171,13 @@ async def submit_answer(
         # 2. 恢复工作流执行
         result = workflow.invoke(None, config)
         
-        # 3. 获取当前轮次的反馈（从 history 中获取最新的有反馈的记录）
-        history = result.get('history', [])
-        # 从后往前查找，找到有反馈的记录（因为如果未结束，最后一条可能是新问题）
-        current_feedback = ''
-        for entry in reversed(history):
-            if entry.get('feedback'):
-                current_feedback = entry.get('feedback', '')
-                break
-        
-        # 4. 构建响应
+        # 3. 构建响应
         is_finished = result.get('is_finished', False)
         
         response = InterviewStatusResponse(
             thread_id=request.thread_id,
             is_finished=is_finished,
-            feedback=current_feedback,
-            round=result.get('round', 0) + (0 if is_finished else 1)
+            round=result.get('round', 0)
         )
         
         if is_finished:

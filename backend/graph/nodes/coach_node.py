@@ -8,17 +8,16 @@ from backend.graph.state import InterviewState
 from backend.graph.agents import coach_agent
 
 
-def search_resources_node(state: InterviewState) -> InterviewState:
+def coach_node(state: InterviewState) -> InterviewState:
     """
     搜索学习资源节点：
     1. 分析面试记录，提取候选人的主要不足
     2. 调用 Coach Agent 搜索学习资源
     """
-    resume_text = state.get('resume_text', '')
     history = state.get('history', [])
     
-    if not resume_text or not history:
-        print("警告: 简历文本或历史记录为空，跳过搜索")
+    if not history:
+        print("警告: 历史记录为空，跳过搜索")
         new_state = state.copy()
         new_state['learning_resources'] = "无搜索结果"
         return new_state
@@ -32,9 +31,6 @@ def search_resources_node(state: InterviewState) -> InterviewState:
         
         # 构建简短清晰的任务提示
         user_message = f"""请分析以下面试记录，找出候选人的2-3个主要技术不足，并为每个不足搜索学习资源。
-
-## 候选人简历
-{resume_text}
 
 ## 面试问答记录
 {qa_summary}

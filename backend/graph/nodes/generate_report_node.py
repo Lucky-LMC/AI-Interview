@@ -23,7 +23,7 @@ def generate_report_node(state: InterviewState) -> InterviewState:
     try:
         # 准备完整的面试记录
         history_text = "\n\n".join([
-            f"**问题 {i+1}**：{h.get('question', '')}\n**回答**：{h.get('answer', '')}\n**反馈**：{h.get('feedback', '')}"
+            f"问题 {i+1}：{h.get('question', '')}\n回答：{h.get('answer', '')}"
             for i, h in enumerate(history)
         ])
         

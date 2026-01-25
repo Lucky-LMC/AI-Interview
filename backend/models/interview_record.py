@@ -34,7 +34,7 @@ class InterviewRecord(Base):
     resume_text = Column(Text, nullable=False, comment="简历文本内容")
     
     # 面试记录（JSON格式）
-    # 格式: [{"question": "", "answer": "", "feedback": ""}, ...]
+    # 格式: [{"question": "", "answer": ""}, ...]
     history = Column(JSON, nullable=False, default=list, comment="面试记录（JSON格式）")
     
     # 最终面试报告
