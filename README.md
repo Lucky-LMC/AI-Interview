@@ -75,7 +75,8 @@ Interview/
 │   │   │   ├── generate_report_node.py   # 报告生成节点
 │   │   │   └── __init__.py
 │   │   ├── tools/            # 工具函数
-│   │   │   ├── coach_tools.py   # 搜索工具（Tavily）
+│   │   │   ├── coach_tools.py        # 搜索工具（Tavily）
+│   │   │   ├── interviewer_tools.py  # 面试工具
 │   │   │   └── __init__.py
 │   │   ├── state/            # 状态定义
 │   │   │   ├── interview_state.py  # 面试状态
@@ -111,10 +112,12 @@ Interview/
 │   │   ├── register.css    # 注册页样式
 │   │   └── main.css        # 主页样式
 │   └── js/                 # JavaScript 脚本
+│       ├── api.js          # API 请求封装
 │       ├── index.js        # 登录逻辑
 │       ├── register.js     # 注册逻辑
 │       └── main.js         # 面试逻辑
 ├── uploads/                # 简历文件存储目录
+├── checkpoints-sqlite/     # SQLite 持久化存储
 ├── .env                    # 环境变量配置（需自行创建）
 ├── requirements.txt        # Python 依赖
 ├── workflow_graph.png      # 工作流可视化图
