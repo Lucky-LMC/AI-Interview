@@ -4,21 +4,23 @@
 用于定义面试系统的整体流程和节点间的流转逻辑
 """
 from langgraph.graph import StateGraph, END, START
-from langgraph.checkpoint.memory import MemorySaver
+import sqlite3
+from langgraph.checkpoint.sqlite import SqliteSaver
 from backend.graph.state import InterviewState
 from backend.graph.nodes import (
     parse_resume_node,       # 解析简历节点
     ask_question_node,       # 出题节点
     answer_node,             # 回答节点（中断点）
-
     check_finish_node,       # 检查是否结束节点
-    check_finish_node,       # 检查是否完成所有轮次
     coach_node,              # 搜索学习资源节点（Coach Agent）
     generate_report_node     # 生成报告节点
 )
 
-# 全局 checkpointer 实例，确保所有请求共享同一个状态存储
-_global_checkpointer = MemorySaver()
+# 全局 checkpointer 实例，确保所有请求共享同一个状态存储 (使用 SQLite 持久化)
+# check_same_thread=False 允许在多线程环境(FastAPI)中使用同一个连接
+# 将数据库文件存放在 checkpoints-sqlite 目录下
+_global_db_connection = sqlite3.connect("checkpoints-sqlite/checkpoints.sqlite", check_same_thread=False)
+_global_checkpointer = SqliteSaver(_global_db_connection)
 
 
 def create_interview_graph():

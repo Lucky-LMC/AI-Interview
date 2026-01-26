@@ -3,7 +3,7 @@
 面试记录模型
 """
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 
 from backend.config import Base
@@ -42,6 +42,9 @@ class InterviewRecord(Base):
     
     # 创建时间（使用本地时间）
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="创建时间")
+    
+    # 面试是否完成：True (已完成), False (进行中)
+    is_finished = Column(Boolean, default=False, nullable=False, comment="面试是否完成")
     
     # 关系：关联用户（用于反向查询）
     user = relationship("User", backref="interview_records")

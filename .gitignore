@@ -10,3 +10,4 @@ build/
 *.log
 uploads/
 Git操作指南.md
+checkpoints-sqlite/

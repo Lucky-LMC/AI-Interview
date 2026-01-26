@@ -72,4 +72,5 @@ class InterviewRecordDetailResponse(BaseModel):
     resume_text: str = Field(..., description="简历文本")
     history: List[Dict[str, str]] = Field(..., description="面试历史记录")
     report: Optional[str] = Field(None, description="最终报告")
+    is_finished: bool = Field(..., description="面试是否完成")
     created_at: str = Field(..., description="创建时间")

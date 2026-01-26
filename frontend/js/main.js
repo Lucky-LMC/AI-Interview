@@ -1,43 +1,19 @@
 // AI模拟面试系统v1.0，作者刘梦畅
 // ========== API 请求模块 ==========
 
-const API_BASE_URL = 'http://localhost:8000/api/interview';
-// const API_BASE_URL = 'http://172.18.174.107:8000/api/interview';
-
-
-// 通用 API 调用函数
-async function callAPI(url, options = {}) {
-    try {
-        const response = await fetch(url, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || '请求失败');
-        }
-
-        return await response.json();
-    } catch (error) {
-        if (error.message === 'Failed to fetch') {
-            throw new Error('无法连接到后端服务，请确保后端服务已启动');
-        }
-        throw error;
-    }
-}
-
 // 开始面试 API
 async function startInterviewAPI(file, maxRounds) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('max_rounds', maxRounds);
 
+    const auth = getAuth();
+
     const response = await fetch(`${API_BASE_URL}/start`, {
         method: 'POST',
+        headers: {
+            'X-User-Name': auth ? auth.userName : ''
+        },
         body: formData
     });
 
@@ -49,7 +25,6 @@ async function startInterviewAPI(file, maxRounds) {
     return await response.json();
 }
 
-// 提交答案 API（非流式版本 - 已弃用，保留作为备用）
 // 提交答案 API（非流式版本）
 async function submitAnswerAPI(threadId, answer) {
     // 获取当前登录用户
@@ -96,16 +71,6 @@ async function getInterviewRecordDetailAPI(threadId) {
     });
 }
 
-// 健康检查 API（未使用 - 保留作为备用）
-// async function checkBackendAPI() {
-//     try {
-//         const response = await fetch('http://localhost:8000/health');
-//         return response.ok;
-//     } catch (error) {
-//         return false;
-//     }
-// }
-
 // ============================================
 // ========== UI 交互和工具函数 ==========
 // ============================================
@@ -116,24 +81,7 @@ let interviewState = getInterviewState();
 // 当前待发送的文件（前端上传时暂存，点击发送时才真正发送）
 let pendingFile = null;
 
-// 显示/隐藏加载提示
-function showLoading(message = '处理中...') {
-    const overlay = document.getElementById('loading-overlay');
-    const messageEl = document.getElementById('loading-message');
-    if (overlay && messageEl) {
-        messageEl.textContent = message;
-        overlay.classList.remove('hidden');
-    }
-}
-
-function hideLoading() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.classList.add('hidden');
-    }
-}
-
-// 显示错误信息
+// 显示错误信息 (覆盖 api.js 的通用方法，使用聊天气泡显示)
 function showError(message) {
     addMessage('ai', `❌ 错误：${message}`, true);
 }
@@ -143,16 +91,7 @@ function showSuccess(message) {
     addMessage('ai', `✅ ${message}`, true);
 }
 
-// 获取认证信息
-function getAuth() {
-    const authStr = sessionStorage.getItem('auth');
-    return authStr ? JSON.parse(authStr) : null;
-}
-
-// 清除认证信息
-function clearAuth() {
-    sessionStorage.removeItem('auth');
-}
+// 获取面试状态
 
 // 获取面试状态
 function getInterviewState() {
@@ -196,10 +135,10 @@ function addMessage(type, content, isError = false, isHtml = false) {
     messageDiv.className = `message ${type}-message`;
 
     // 获取用户头像（用户名第一个字符）
-    let avatar;
+    let avatar = '';
     if (type === 'ai') {
         avatar = '🤖';
-    } else {
+    } else if (type === 'user') {
         const auth = getAuth();
         const userName = auth ? (auth.userName || 'U') : 'U';
         avatar = userName.charAt(0).toUpperCase();
@@ -250,11 +189,7 @@ function addMessage(type, content, isError = false, isHtml = false) {
     // 创建头像元素
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'message-avatar';
-    if (type === 'user') {
-        avatarDiv.textContent = avatar;
-    } else {
-        avatarDiv.textContent = avatar;
-    }
+    avatarDiv.textContent = avatar;
 
     messageDiv.appendChild(avatarDiv);
     messageDiv.appendChild(messageContent);
@@ -278,13 +213,13 @@ function addLoadingMessage() {
         <span class="thinking-text">正在思考</span><span class="thinking-dots"></span>
     `;
     const messageDiv = addMessage('ai', loadingHtml, false, true);
-    
+
     // 给思考消息的气泡添加特殊class，让宽度自适应
     const messageContent = messageDiv.querySelector('.message-content');
     if (messageContent) {
         messageContent.classList.add('thinking-bubble');
     }
-    
+
     return messageDiv;
 }
 
@@ -292,80 +227,6 @@ function addLoadingMessage() {
 function removeLoadingMessage(messageDiv) {
     if (messageDiv && messageDiv.parentNode) {
         messageDiv.parentNode.removeChild(messageDiv);
-    }
-}
-
-/**
- * 【流式消息 - 创建】添加一个流式消息到聊天区域
- * 
- * 用途：在开始接收流式数据时，先创建一个空的消息框
- * 返回：消息的 DOM 元素，供后续更新使用
- * 
- * @param {string} type - 消息类型（'ai' 或 'user'）
- * @param {string} initialContent - 初始内容（通常是标题，如 "📊 反馈结果："）
- * @returns {HTMLElement} 消息的 DOM 元素
- */
-function addStreamingMessage(type, initialContent) {
-    const messagesContainer = document.getElementById('chat-messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}-message`;
-
-    // 获取用户头像
-    let avatar = type === 'ai' ? '🤖' : 'U';
-
-    const messageContent = document.createElement('div');
-    messageContent.className = 'message-content';
-
-    // 创建消息文本容器（用于后续更新）
-    const messageText = document.createElement('div');
-    messageText.className = 'message-text';
-    messageText.textContent = initialContent;  // 设置初始内容
-
-    messageContent.appendChild(messageText);
-
-    // 创建头像元素
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-avatar';
-    avatarDiv.textContent = avatar;
-
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(messageContent);
-
-    // 添加到聊天区域
-    messagesContainer.appendChild(messageDiv);
-
-    // 滚动到容器最底部（使用 requestAnimationFrame 确保 DOM 已更新）
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        });
-    });
-
-    // 返回消息元素，供后续更新使用
-    return messageDiv;
-}
-
-/**
- * 【流式消息 - 更新】更新流式消息的内容（打字机效果）
- * 
- * 用途：在接收到新的流式数据时，更新消息内容
- * 原理：直接替换 textContent，浏览器会自动重新渲染
- * 
- * @param {HTMLElement} messageDiv - 消息的 DOM 元素（由 addStreamingMessage 返回）
- * @param {string} content - 新的内容（累加后的完整内容）
- */
-function updateStreamingMessage(messageDiv, content) {
-    if (!messageDiv) return;
-
-    // 找到消息文本容器
-    const messageText = messageDiv.querySelector('.message-text');
-    if (messageText) {
-        // 更新文本内容（浏览器会自动重新渲染，形成打字机效果）
-        messageText.textContent = content;
-
-        // 立即滚动到底部（确保用户能看到最新内容）
-        const messagesContainer = document.getElementById('chat-messages');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }
 
@@ -395,6 +256,8 @@ function handleUploadResume(file) {
 
     // 在聊天中提示
     addMessage('ai', '📄 文件已选择，点击发送按钮开始解析并开始面试。');
+
+    if (window.triggerCheckSendButton) window.triggerCheckSendButton();
 }
 
 // 处理开始面试（合并文件上传和工作流启动）
@@ -406,11 +269,11 @@ async function handleStartInterview() {
 
     // 保存文件名（在清除 pendingFile 之前）
     const fileName = pendingFile.name;
-    
+
     // 立即在聊天中显示文件卡片（用户消息）- 先显示PDF
     const fileCardHtml = `<div class="file-card"><span class="file-card-icon">📄</span><div class="file-card-info"><span class="file-card-name">${fileName}</span></div></div>`;
     addMessage('user', fileCardHtml, false, true);
-    
+
     // 立即清除待发送文件和隐藏文件预览（在发送请求之前）
     const fileToSend = pendingFile;
     pendingFile = null;
@@ -445,11 +308,14 @@ async function handleStartInterview() {
         // 重新加载记录列表以更新高亮
         renderInterviewRecords();
 
+        // 初始化右侧仪表盘
+        updateDashboard(result);
+
         // 更新已显示的文件卡片，添加点击功能
         if (result.resume_text) {
             const escapedText = result.resume_text.replace(/"/g, '&quot;');
             const pdfUrl = result.resume_file_url || '';
-            
+
             // 找到刚才添加的文件卡片，添加 data 属性
             const messages = document.getElementById('chat-messages');
             const lastFileCard = messages.querySelector('.file-card:last-of-type');
@@ -457,7 +323,7 @@ async function handleStartInterview() {
                 lastFileCard.setAttribute('data-resume', escapedText);
                 lastFileCard.setAttribute('data-pdf-url', pdfUrl);
             }
-            
+
             addMessage('ai', '✅ 文件解析成功！');
         }
 
@@ -466,7 +332,7 @@ async function handleStartInterview() {
         addMessage('ai', `🎯 **识别到的目标岗位**：${targetPosition}\n\n📋 **简历关键信息**：\n${result.resume_text}`);
 
         // 显示第一个问题
-        addMessage('ai', `📊 面试开始！\n\n当前轮次：${result.round} / ${interviewState.maxRounds}\n\n❓ 问题：\n${result.question}`);
+        addMessage('ai', `📊 面试开始！\n\n当前轮次：第 ${result.round} 轮\n\n❓ 问题：\n${result.question}`);
     } catch (error) {
         removeLoadingMessage(loadingMsg);
         showError(`开始面试失败：${error.message}`);
@@ -518,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (filePreview) {
                 filePreview.classList.add('hidden');
             }
+            if (window.triggerCheckSendButton) window.triggerCheckSendButton();
         });
     }
 
@@ -549,194 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// ============================================
-// ========== 流式输出处理函数 ==========
-// ============================================
 
-/**
- * 【流式输出】处理提交答案（使用 Fetch API + ReadableStream）
- * 
- * 核心技术：
- * 1. Fetch API：发送 HTTP 请求
- * 2. ReadableStream：接收服务器推送的数据流
- * 3. TextDecoder：将二进制数据解码为文本
- * 4. SSE 协议解析：解析 "data: {...}\n\n" 格式的消息
- * 5. 打字机效果：逐字符累加并更新 UI
- * 
- * 流程：
- * 1. 发送 POST 请求到 /submit/stream
- * 2. 获取响应的 ReadableStream
- * 3. 逐块读取数据流（每块可能包含多条 SSE 消息）
- * 4. 解析 SSE 消息（提取 JSON 数据）
- * 5. 根据消息类型更新 UI（打字机效果）
- */
-// async function handleSubmitAnswerStream(answer) {
-//     // ========== 步骤1：输入验证 ==========
-//     if (!answer.trim()) {
-//         showError('请先输入您的回答');
-//         return;
-//     }
-// 
-//     if (!interviewState.threadId) {
-//         showError('面试未开始，请先上传简历并开始面试');
-//         return;
-//     }
-// 
-//     // 在聊天区域显示用户的回答
-//     addMessage('user', answer);
-// 
-//     try {
-//         // ========== 步骤2：准备请求数据 ==========
-//         // 获取认证信息（用户名）
-//         const auth = getAuth();
-//         const requestBody = {
-//             thread_id: interviewState.threadId,  // 会话 ID
-//             answer: answer,  // 用户的回答
-//             user_name: auth.userName  // 用户名
-//         };
-// 
-//         // ========== 步骤3：发送 HTTP POST 请求 ==========
-//         // 使用 Fetch API 发送请求到流式接口
-//         const response = await fetch(`${API_BASE_URL}/submit/stream`, {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json'  // 请求体是 JSON 格式
-//             },
-//             body: JSON.stringify(requestBody)  // 将 JS 对象转换为 JSON 字符串
-//         });
-// 
-//         // 检查响应状态
-//         if (!response.ok) {
-//             throw new Error('流式请求失败');
-//         }
-// 
-//         // ========== 步骤4：获取 ReadableStream 并准备读取 ==========
-//         // response.body 是一个 ReadableStream，可以逐块读取数据
-//         const reader = response.body.getReader();
-//         // TextDecoder 用于将二进制数据（Uint8Array）解码为文本（UTF-8）
-//         const decoder = new TextDecoder();
-// 
-//         // ========== 步骤5：初始化累加变量 ==========
-//         // 用于累加 LLM 逐字符输出的内容（打字机效果）
-//         let feedbackContent = '';  // 累加反馈内容
-//         let questionContent = '';  // 累加问题内容
-//         let reportContent = '';    // 累加报告内容
-//         let currentMessageDiv = null;  // 当前正在更新的消息 DOM 元素
-// 
-//         // ========== 步骤6：循环读取数据流 ==========
-//         // ReadableStream 是异步的，需要使用 while 循环逐块读取
-//         while (true) {
-//             // 读取一块数据（chunk）
-//             // done: 布尔值，表示流是否结束
-//             // value: Uint8Array，包含二进制数据
-//             const { done, value } = await reader.read();
-//             if (done) break;  // 流结束，退出循环
-// 
-//             // ========== 步骤7：解码二进制数据为文本 ==========
-//             // 将 Uint8Array 解码为 UTF-8 字符串
-//             const chunk = decoder.decode(value);
-//             // 按行分割（SSE 协议中，每条消息以 \n\n 结尾）
-//             const lines = chunk.split('\n');
-// 
-//             // ========== 步骤8：逐行解析 SSE 消息 ==========
-//             for (const line of lines) {
-//                 // SSE 消息格式：data: {...}
-//                 if (line.startsWith('data: ')) {
-//                     // 提取 JSON 数据（去掉 "data: " 前缀）
-//                     const data = line.slice(6);
-// 
-//                     // 跳过结束标记
-//                     if (data === '[DONE]') {
-//                         continue;
-//                     }
-// 
-//                     try {
-//                         // ========== 步骤9：解析 JSON 数据 ==========
-//                         const json = JSON.parse(data);
-// 
-//                         // 处理错误消息
-//                         if (json.error) {
-//                             showError(json.error);
-//                             return;
-//                         }
-// 
-//                         // ========== 步骤10：根据消息类型处理（打字机效果的核心！）==========
-// 
-//                         // ---------- 反馈相关消息 ----------
-//                         if (json.type === 'feedback_start') {
-//                             // 反馈开始：重置累加变量，创建新的消息 DOM 元素
-//                             feedbackContent = '';
-//                             currentMessageDiv = addStreamingMessage('ai', '📊 反馈结果：\n\n');
-//                         } else if (json.type === 'feedback' && json.content) {
-//                             // 反馈内容：逐字符累加并更新 UI（打字机效果！）
-//                             feedbackContent += json.content;  // 累加新内容
-//                             updateStreamingMessage(currentMessageDiv, `📊 反馈结果：\n\n${feedbackContent}`);
-//                         } else if (json.type === 'feedback_end') {
-//                             // 反馈结束：保存到状态，清空当前消息元素
-//                             interviewState.lastFeedback = feedbackContent;
-//                             currentMessageDiv = null;
-//                         }
-// 
-//                         // ---------- 问题相关消息 ----------
-//                         else if (json.type === 'question_start') {
-//                             // 问题开始：重置累加变量，创建新的消息 DOM 元素
-//                             questionContent = '';
-//                             currentMessageDiv = addStreamingMessage('ai', '❓ 下一个问题：\n\n');
-//                         } else if (json.type === 'question' && json.content) {
-//                             // 问题内容：逐字符累加并更新 UI（打字机效果！）
-//                             questionContent += json.content;  // 累加新内容
-//                             updateStreamingMessage(currentMessageDiv, `❓ 下一个问题：\n\n${questionContent}`);
-//                         } else if (json.type === 'question_end') {
-//                             // 问题结束：保存到状态，清空当前消息元素
-//                             interviewState.currentQuestion = questionContent;
-//                             currentMessageDiv = null;
-//                         }
-// 
-//                         // ---------- 报告相关消息 ----------
-//                         else if (json.type === 'report_start') {
-//                             // 报告开始：重置累加变量，创建新的消息 DOM 元素
-//                             reportContent = '';
-//                             currentMessageDiv = addStreamingMessage('ai', '🎉 面试已完成！\n\n📋 最终报告：\n\n');
-//                         } else if (json.type === 'report' && json.content) {
-//                             // 报告内容：逐字符累加并更新 UI（打字机效果！）
-//                             reportContent += json.content;  // 累加新内容
-//                             updateStreamingMessage(currentMessageDiv, `🎉 面试已完成！\n\n📋 最终报告：\n\n${reportContent}`);
-//                         } else if (json.type === 'report_end') {
-//                             // 报告结束：保存到状态，清空当前消息元素
-//                             interviewState.finalReport = reportContent;
-//                             currentMessageDiv = null;
-//                         }
-// 
-//                         // ---------- 流程控制消息 ----------
-//                         else if (json.type === 'continue') {
-//                             // 面试继续：更新轮次，保存状态
-//                             interviewState.currentRound = json.round;
-//                             interviewState.isReadOnly = false;
-//                             saveInterviewState(interviewState);
-//                         } else if (json.type === 'finished') {
-//                             // 面试结束：更新状态，重新加载记录列表
-//                             interviewState.currentRound = json.round;
-//                             interviewState.currentQuestion = null;
-//                             interviewState.isReadOnly = false;
-//                             saveInterviewState(interviewState);
-//                             // 重新加载记录列表（面试完成后会新增一条记录）
-//                             renderInterviewRecords();
-//                         }
-//                     } catch (e) {
-//                         // JSON 解析失败，打印错误日志
-//                         console.error('解析 JSON 失败:', e, data);
-//                     }
-//                 }
-//             }
-//         }
-// 
-//     } catch (error) {
-//         hideLoading();
-//         showError(`提交失败：${error.message}`);
-//     }
-// }
-
-// 处理提交答案（非流式版本 - 已弃用，使用 handleSubmitAnswerStream 代替）
 // 处理提交答案（非流式版本）
 async function handleSubmitAnswer(answer) {
     if (!answer.trim()) {
@@ -788,7 +468,7 @@ async function handleSubmitAnswer(answer) {
             saveInterviewState(interviewState);
             // hideLoading();
 
-            addMessage('ai', `✅ 反馈已生成！\n\n当前轮次：${result.round} / ${interviewState.maxRounds}\n\n❓ 下一个问题：\n${result.question || ''}`);
+            addMessage('ai', `📊 第 ${result.round} 轮\n\n❓ 问题：\n${result.question || ''}`);
         }
     } catch (error) {
         // hideLoading();
@@ -938,6 +618,9 @@ async function loadInterviewRecord(threadId) {
         const chatMessages = document.getElementById('chat-messages');
         chatMessages.innerHTML = '';
 
+        // 更新右侧面试看板
+        updateDashboard(record);
+
         // 显示简历内容
         if (record.resume_text) {
             addMessage('ai', `📄 简历内容：\n\n${record.resume_text}`);
@@ -968,21 +651,50 @@ async function loadInterviewRecord(threadId) {
             addMessage('ai', `🎉 最终报告：\n\n${record.report}`);
         }
 
-        // 显示记录信息
-        addMessage('ai', `📋 记录信息\n\n用户：${record.user_name}\n会话ID：${record.thread_id}\n创建时间：${record.created_at}\n总轮次：${record.history ? record.history.length : 0}`);
+        // 设置 input area 的显示状态
+        const inputArea = document.querySelector('.chat-input-area');
+        if (record.is_finished) {
+            // 已完成：只读模式，隐藏输入框
+            interviewState = {
+                threadId: record.thread_id,
+                currentQuestion: null,
+                currentRound: record.history ? record.history.length : 0,
+                maxRounds: record.history ? record.history.length : 0,
+                resumeText: record.resume_text,
+                lastFeedback: null,
+                finalReport: record.report,
+                isReadOnly: true
+            };
+            if (inputArea) inputArea.style.display = 'none';
+        } else {
+            // 进行中：恢复模式，显示输入框
+            // 找到最后一个问题，作为 currentQuestion
+            let lastQuestion = '';
+            // 逻辑修正：如果 history 最后一项有 question 但没 answer，那就是当前待回答的问题
+            // 如果都有，那可能是正在生成中或者异常，这里简化处理，取最后一个 question
+            if (record.history && record.history.length > 0) {
+                const lastEntry = record.history[record.history.length - 1];
+                if (lastEntry.question && !lastEntry.answer) {
+                    lastQuestion = lastEntry.question;
+                }
+            }
 
-        // 更新面试状态（设置为只读模式）
-        interviewState = {
-            threadId: record.thread_id,
-            currentQuestion: null,
-            currentRound: record.history ? record.history.length : 0,
-            maxRounds: record.history ? record.history.length : 0,
-            resumeText: record.resume_text,
-            lastFeedback: null,
-            finalReport: record.report,
-            isReadOnly: true  // 标记为只读模式
-        };
+            interviewState = {
+                threadId: record.thread_id,
+                currentQuestion: lastQuestion, // 恢复当前问题
+                currentRound: record.history ? record.history.length : 0, // 轮次
+                maxRounds: 3, // 这里后端没存 max_rounds，暂时默认 3，或者得从后端取
+                resumeText: record.resume_text,
+                lastFeedback: null,
+                finalReport: null,
+                isReadOnly: false
+            };
 
+            if (inputArea) inputArea.style.display = 'flex';
+
+        }
+
+        saveInterviewState(interviewState);
         hideLoading();
 
     } catch (error) {
@@ -1014,19 +726,33 @@ function initMainPage() {
         userAvatarText.textContent = (auth.userName || 'U').charAt(0).toUpperCase();
     }
 
-    // 恢复面试状态
-    interviewState = getInterviewState();
+    // 页面刷新默认为新对话状态
+    // 清除本地缓存的状态，或者重置为默认状态，不自动恢复对话
+    // interviewState = getInterviewState(); // 不再从 localStorage 恢复
+    interviewState = {
+        threadId: null,
+        currentQuestion: null,
+        currentRound: 1,
+        maxRounds: 3,
+        resumeText: '',
+        resumeFileUrl: null,
+        lastFeedback: null,
+        finalReport: null,
+        isReadOnly: false
+    };
+    saveInterviewState(interviewState); // 更新 localStorage 为初始状态
 
     // 清除待发送文件（页面刷新后重新开始）
     pendingFile = null;
 
-    // 如果有进行中的面试，显示当前问题
-    if (interviewState.currentQuestion && !interviewState.isReadOnly) {
-        addMessage('ai', `📊 继续面试\n\n当前轮次：${interviewState.currentRound} / ${interviewState.maxRounds}\n\n❓ 问题：\n${interviewState.currentQuestion}`);
-    }
+    // 不再自动显示进行中的面试问题
+    // if (interviewState.currentQuestion && !interviewState.isReadOnly) { ... }
 
     // 加载面试记录列表
     renderInterviewRecords();
+
+    // 显示默认欢迎消息
+    addMessage('ai', '欢迎使用 AI 模拟面试系统！\n请先上传您的简历，然后点击发送开始面试。');
 
     // 设置事件监听器
     setupEventListeners();
@@ -1061,6 +787,11 @@ function setupEventListeners() {
                     finalReport: null,
                     isReadOnly: false
                 };
+
+                // 恢复输入框显示
+                const inputArea = document.querySelector('.chat-input-area');
+                if (inputArea) inputArea.style.display = 'flex';
+
                 pendingFile = null;
                 currentViewingThreadId = null;
                 saveInterviewState(interviewState);
@@ -1097,6 +828,25 @@ function setupEventListeners() {
     const chatInput = document.getElementById('chat-input');
 
     if (sendBtn && chatInput) {
+        // 检查发送按钮状态
+        function checkSendButtonState() {
+            const text = chatInput.value.trim();
+            const hasFile = !!pendingFile;
+
+            if (text || hasFile) {
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                sendBtn.style.cursor = 'pointer';
+            } else {
+                sendBtn.disabled = true;
+                sendBtn.style.opacity = '0.5';
+                sendBtn.style.cursor = 'not-allowed';
+            }
+        }
+
+        // 初始化状态
+        checkSendButtonState();
+
         sendBtn.addEventListener('click', () => {
             const text = chatInput.value.trim();
 
@@ -1105,6 +855,7 @@ function setupEventListeners() {
                 addMessage('ai', '当前正在查看历史记录，无法开始新面试。请点击"开启新对话"开始新的面试。');
                 chatInput.value = '';
                 autoResizeTextarea(chatInput);
+                checkSendButtonState(); // 重置状态
                 return;
             }
 
@@ -1113,6 +864,7 @@ function setupEventListeners() {
                 handleStartInterview();
                 chatInput.value = '';
                 autoResizeTextarea(chatInput);
+                checkSendButtonState(); // 重置状态
                 return;
             }
 
@@ -1138,9 +890,10 @@ function setupEventListeners() {
                 }
                 chatInput.value = '';
                 autoResizeTextarea(chatInput);
+                checkSendButtonState(); // 重置状态
             } else if (!pendingFile) {
-                // 没有文本也没有文件，提示用户
-                addMessage('ai', '请先上传简历文件或输入内容。');
+                // 理论上按钮disabled了进不来，但保留兜底
+                // addMessage('ai', '请先上传简历文件或输入内容。');
             }
         });
 
@@ -1148,19 +901,160 @@ function setupEventListeners() {
         chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendBtn.click();
+                if (!sendBtn.disabled) {
+                    sendBtn.click();
+                }
             }
         });
 
-        // 自动调整高度
+        // 自动调整高度并检查按钮
         chatInput.addEventListener('input', () => {
             autoResizeTextarea(chatInput);
+            checkSendButtonState();
         });
     }
+
+    // 暴露 checkSendButtonState 给其他函数使用（如果有需要，或者通过事件机制）
+    // 为了简单，我们把 checkSendButtonState 挂载到 window 或者在 handleUploadResume 里触发 input 事件来间接触发检查
+    // 更优雅的方式是在 handleUploadResume 里手动调用，但因为作用域问题，
+    // 我们可以在 handleUploadResume 里模拟触发一下 chatInput 的 input 事件
+    window.triggerCheckSendButton = function () {
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+            // 手动触发 input 事件监听器
+            const event = new Event('input');
+            chatInput.dispatchEvent(event);
+        }
+    };
 
 }
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', () => {
     initMainPage();
+
+    // 隐藏首屏加载动画
+    const loader = document.getElementById('initial-loading');
+    if (loader) {
+        //稍微延迟一点以确保渲染完成
+        setTimeout(() => {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 500);
+        }, 300);
+    }
 });
+
+// 更新右侧面试看板
+function updateDashboard(data) {
+    const dashboardContainer = document.getElementById('dashboard-container');
+    if (!dashboardContainer) return;
+
+    // 清空空状态提示
+    dashboardContainer.innerHTML = '';
+
+    // 如果没有数据，显示默认状态（处理数据异常或初始状态）
+    if (!data || (!data.thread_id && !data.id && !data.history && !data.round)) {
+        dashboardContainer.innerHTML = `
+            <div class="dashboard-empty">
+                <div class="empty-icon">📊</div>
+                <p>暂无进行中的面试</p>
+                <p class="empty-sub">开始面试后，此处将显示实时进度和档案。</p>
+            </div>`;
+        return;
+    }
+
+    const isFinished = data.is_finished;
+    const statusClass = isFinished ? 'status-finished' : 'status-active';
+    const statusText = isFinished ? '已完成' : '进行中';
+    const shortId = (data.thread_id || data.id || '').substring(0, 8);
+    const userName = data.user_name || getAuth()?.userName || 'User';
+
+    // 时间处理
+    let timeStr = data.created_at || new Date().toLocaleString();
+
+    // 估算进度
+    const maxRounds = 3;
+    let progressPercent = 0;
+    let progressText = "0%";
+    let progressSub = "准备就绪";
+
+    // 计算轮次
+    let currentRound = 1;
+
+    if (data.history) {
+        const roundsCount = data.history.length;
+        if (roundsCount > 0) {
+            const lastItem = data.history[roundsCount - 1];
+            if (lastItem.question && !lastItem.answer) {
+                currentRound = roundsCount;
+            } else {
+                currentRound = roundsCount + 1;
+            }
+        }
+    } else if (data.round) {
+        // 如果数据中直接包含了round (来自API返回)，直接使用
+        currentRound = data.round;
+    }
+
+    if (isFinished) {
+        progressPercent = 100;
+        progressText = "100%";
+        progressSub = "全部完成";
+    } else {
+        // 计算进度条
+        let completedRounds = currentRound - 1;
+        progressPercent = Math.min(Math.round((completedRounds / maxRounds) * 100) + 10, 95);
+
+        progressText = `R${currentRound}`;
+        progressSub = `第 ${currentRound} / ${maxRounds} 轮`;
+    }
+
+    const metaCardHtml = `
+        <div class="record-meta-container">
+            <div class="record-meta-card">
+                <div class="meta-watermark">
+                     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3H14.82C14.4,1.84 13.3,1 12,1C10.7,1 9.6,1.84 9.18,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M12,3A1,1 0 0,1 13,3H11A1,1 0 0,1 12,3M7,7H17V5H19V19H5V5H7V7M7.5,13.5L9,12L11,14L15.5,9.5L17,11L11,17L7.5,13.5Z" /></svg>
+                </div>
+                <div class="card-content">
+                    <div class="meta-header">
+                        <div class="meta-title">
+                            <span class="meta-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </span> 
+                            面试档案
+                        </div>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                    
+                    <div class="meta-body">
+                        <div class="meta-info-col">
+                            <div class="meta-item">
+                                <span class="meta-label">ID</span>
+                                <span class="meta-value">${shortId}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">用户</span>
+                                <span class="meta-value">${userName}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">时间</span>
+                                <span class="meta-value long">${timeStr}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="meta-progress-col">
+                            <div class="progress-label">面试进度</div>
+                            <div class="progress-text">${progressText}</div>
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                            </div>
+                            <div class="progress-sub">${progressSub}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    dashboardContainer.innerHTML = metaCardHtml;
+}

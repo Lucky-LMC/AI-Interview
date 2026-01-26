@@ -6,11 +6,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能面试辅助系统</title>
-    <link rel="stylesheet" href="css/common.css?v=6.0">
-    <link rel="stylesheet" href="css/main.css?v=6.0">
+    <link rel="stylesheet" href="css/common.css?v=8.0">
+    <link rel="stylesheet" href="css/main.css?v=8.0">
+    <style>
+        #initial-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f8fafc;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s;
+        }
+
+        .init-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: init-spin 1s linear infinite;
+        }
+
+        @keyframes init-spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
 
 <body>
+    <div id="initial-loading">
+        <div class="init-spinner"></div>
+    </div>
     <!-- 左侧边栏 -->
     <aside class="sidebar">
         <!-- 顶部Logo和用户 -->
@@ -67,16 +104,7 @@
 
         <!-- 对话消息区域 -->
         <div class="chat-messages" id="chat-messages">
-            <!-- 欢迎消息 -->
-            <div class="message ai-message">
-                <div class="message-avatar">🤖</div>
-                <div class="message-content">
-                    <div class="message-text">
-                        <p>欢迎使用智能面试辅助系统！</p>
-                        <p>请先上传您的简历，然后开始面试。</p>
-                    </div>
-                </div>
-            </div>
+            <!-- 动态消息将插入这里 -->
         </div>
 
         <!-- 底部输入区 -->
@@ -114,6 +142,21 @@
         <input type="file" id="resume-file-input" accept=".pdf" style="display: none;">
     </main>
 
+    <!-- 右侧边栏 -->
+    <aside class="right-sidebar" id="right-sidebar">
+        <div class="right-sidebar-header">
+            <h3>面试看板</h3>
+        </div>
+        <div class="right-sidebar-content" id="dashboard-container">
+            <!-- 仪表盘内容将在这里动态生成 -->
+            <div class="dashboard-empty">
+                <div class="empty-icon">📊</div>
+                <p>暂无进行中的面试</p>
+                <p class="empty-sub">开始面试后，此处将显示实时进度和档案。</p>
+            </div>
+        </div>
+    </aside>
+
     <!-- 简历内容查看模态框 -->
     <div id="resume-modal" class="modal hidden">
         <div class="modal-content">
@@ -136,7 +179,8 @@
 
     <!-- Markdown 渲染库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/api.js?v=8.0" defer></script>
+    <script src="js/main.js?v=8.0" defer></script>
 </body>
 
 </html>
