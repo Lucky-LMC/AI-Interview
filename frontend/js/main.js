@@ -129,7 +129,7 @@ function clearInterviewState() {
 }
 
 // 添加消息到聊天区域
-function addMessage(type, content, isError = false, isHtml = false) {
+function addMessage(type, content, isError = false, isHtml = false, isDocument = false) {
     const messagesContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
@@ -152,6 +152,11 @@ function addMessage(type, content, isError = false, isHtml = false) {
         messageContent.classList.add('is-file');
     }
 
+    // 如果是文档模式，添加 markdown-document 类
+    if (isDocument) {
+        messageContent.classList.add('markdown-document');
+    }
+
     if (isError) {
         messageContent.style.borderLeft = '4px solid var(--error-color)';
     }
@@ -171,7 +176,10 @@ function addMessage(type, content, isError = false, isHtml = false) {
         if (hasMarkdown && typeof marked !== 'undefined') {
             // 使用 marked.js 渲染 Markdown
             messageText.innerHTML = marked.parse(content);
-            messageText.classList.add('markdown-content');
+            // 只有在非文档模式下才添加 markdown-content 类，避免样式冲突
+            if (!isDocument) {
+                messageText.classList.add('markdown-content');
+            }
         } else {
             // 处理纯文本多行
             const lines = content.split('\n');
@@ -206,18 +214,22 @@ function addMessage(type, content, isError = false, isHtml = false) {
     return messageDiv;
 }
 
-// 添加加载消息（打字机动画）
 // 添加加载消息（思考中动画）
 function addLoadingMessage() {
+    // 使用纯 CSS 动画的加载指示器
     const loadingHtml = `
-        <span class="thinking-text">正在思考</span><span class="thinking-dots"></span>
+        <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
     `;
     const messageDiv = addMessage('ai', loadingHtml, false, true);
 
-    // 给思考消息的气泡添加特殊class，让宽度自适应
+    // 给思考消息的气泡添加特殊class
     const messageContent = messageDiv.querySelector('.message-content');
     if (messageContent) {
-        messageContent.classList.add('thinking-bubble');
+        messageContent.classList.add('loading-bubble');
     }
 
     return messageDiv;
@@ -329,10 +341,11 @@ async function handleStartInterview() {
 
         // 显示目标岗位信息
         const targetPosition = result.target_position || '未识别';
-        addMessage('ai', `🎯 **识别到的目标岗位**：${targetPosition}\n\n📋 **简历关键信息**：\n${result.resume_text}`);
+        // 使用文档模式显示简历分析结果，使其看起来像一份正式的文档
+        addMessage('ai', `# 🎯 简历分析报告\n\n**识别到的目标岗位**：${targetPosition}\n\n---\n\n${result.resume_text}`, false, false, true);
 
         // 显示第一个问题
-        addMessage('ai', `📊 面试开始！\n\n当前轮次：第 ${result.round} 轮\n\n❓ 问题：\n${result.question}`);
+        addMessage('ai', `# 📊 第 ${result.round} 轮面试\n\n### ❓ 问题：\n\n${result.question}`, false, false, true);
     } catch (error) {
         removeLoadingMessage(loadingMsg);
         showError(`开始面试失败：${error.message}`);
@@ -455,7 +468,7 @@ async function handleSubmitAnswer(answer) {
             saveInterviewState(interviewState);
             // hideLoading();
 
-            addMessage('ai', `🎉 面试已完成！\n\n最终报告：\n${result.report || '暂无报告'}`);
+            addMessage('ai', `# 🎉 面试最终报告\n\n${result.report || '暂无报告'}`, false, false, true);
 
             // 重新加载记录列表（面试完成后会新增一条记录）
             renderInterviewRecords();
@@ -468,7 +481,7 @@ async function handleSubmitAnswer(answer) {
             saveInterviewState(interviewState);
             // hideLoading();
 
-            addMessage('ai', `📊 第 ${result.round} 轮\n\n❓ 问题：\n${result.question || ''}`);
+            addMessage('ai', `# 📊 第 ${result.round} 轮面试\n\n### ❓ 问题：\n\n${result.question || ''}`, false, false, true);
         }
     } catch (error) {
         // hideLoading();
@@ -623,7 +636,7 @@ async function loadInterviewRecord(threadId) {
 
         // 显示简历内容
         if (record.resume_text) {
-            addMessage('ai', `📄 简历内容：\n\n${record.resume_text}`);
+            addMessage('ai', `# 📄 简历内容\n\n${record.resume_text}`, false, false, true);
         }
 
         // 显示面试历史
@@ -631,7 +644,7 @@ async function loadInterviewRecord(threadId) {
             record.history.forEach((item, index) => {
                 // 显示问题
                 if (item.question) {
-                    addMessage('ai', `📊 第 ${index + 1} 轮\n\n❓ 问题：\n${item.question}`);
+                    addMessage('ai', `# 📊 第 ${index + 1} 轮面试\n\n### ❓ 问题：\n\n${item.question}`, false, false, true);
                 }
 
                 // 显示回答
@@ -648,7 +661,7 @@ async function loadInterviewRecord(threadId) {
 
         // 显示最终报告
         if (record.report) {
-            addMessage('ai', `🎉 最终报告：\n\n${record.report}`);
+            addMessage('ai', `# 🎉 面试最终报告\n\n${record.report}`, false, false, true);
         }
 
         // 设置 input area 的显示状态

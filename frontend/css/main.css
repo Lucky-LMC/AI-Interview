@@ -14,9 +14,12 @@ body {
 
 /* ========== 左侧边栏 ========== */
 .sidebar {
-    width: 260px;
-    background: #f5f5f5;
-    border-right: 1px solid #e5e5e5;
+    width: 280px;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.02);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -24,6 +27,7 @@ body {
     left: 0;
     top: 0;
     flex-shrink: 0;
+    z-index: 100;
 }
 
 .sidebar-top {
@@ -141,15 +145,17 @@ body {
 }
 
 .chat-item:hover {
-    background-color: #e5e5e5;
+    background-color: rgba(0, 0, 0, 0.04);
 }
 
 .chat-item.active {
-    background-color: #3b82f6;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .chat-item.active .chat-title {
-    color: #ffffff;
+    color: var(--primary-color);
+    font-weight: 600;
 }
 
 .chat-title {
@@ -170,7 +176,8 @@ body {
 }
 
 .chat-item.active .chat-meta {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--primary-color);
+    opacity: 0.8;
 }
 
 .chat-menu-btn {
@@ -293,7 +300,7 @@ body {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(20px);
     }
 
     to {
@@ -337,10 +344,13 @@ body {
 }
 
 .message-content {
-    background: var(--card-bg);
+    background: #ffffff;
+    border: 1px solid #e1e4e8 !important;
+    /* 统一气泡边框颜色 */
     border-radius: 12px;
     padding: 16px;
-    box-shadow: var(--shadow);
+    box-shadow: none !important;
+    /* 统一去除阴影 */
     position: relative;
     max-width: fit-content;
 }
@@ -355,6 +365,9 @@ body {
     display: inline-flex;
     align-items: center;
     padding: 8px 12px;
+    border: 1px solid #e1e4e8 !important;
+    /* 思考气泡也统一边框 */
+    box-shadow: none !important;
 }
 
 .ai-message .message-content.thinking-bubble .message-text {
@@ -375,8 +388,10 @@ body {
 .user-message .message-content {
     background: #ffffff;
     color: var(--text-primary);
-    border: 1px solid #e5e5e5;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e1e4e8 !important;
+    /* 统一用户消息边框 */
+    box-shadow: none !important;
+    /* 统一去除阴影 */
     margin-left: auto;
 }
 
@@ -767,25 +782,41 @@ body {
 /* ========== 底部输入区 ========== */
 .chat-input-container {
     position: fixed;
-    bottom: 0;
-    left: 260px;
-    right: 340px;
-    padding: 16px 24px;
-    background: var(--bg-color);
-    max-width: 900px;
-    margin: 0 auto;
-    width: auto;
-    box-sizing: border-box;
-    z-index: 10;
-    transition: right 0.3s ease;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 800px;
+    padding: 0 24px;
+    background: transparent;
+    z-index: 50;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+/* 适配不同侧边栏状态下的输入框位置 */
+.main-content:not(.sidebar-collapsed) .chat-input-container {
+    left: calc(50% + 140px);
+    /* 280px / 2 */
+}
+
+/* 右侧边栏展开时需要左移一点 */
+.main-content:has(+ .right-sidebar:not(.collapsed)) .chat-input-container {
+    left: calc(50% - 30px);
+    /* Adjust based on right sidebar width */
+}
+
+
 .chat-input-wrapper {
-    background: var(--bg-color);
-    border-radius: 12px;
-    padding: 0;
-    border: 1px solid var(--border-color);
-    transition: border-color 0.2s;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 4px 8px;
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -793,6 +824,10 @@ body {
 
 .chat-input-wrapper:focus-within {
     border-color: var(--primary-color);
+    box-shadow:
+        0 8px 30px rgba(37, 99, 235, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+    transform: translateY(-2px);
 }
 
 .input-icon-btn {
@@ -1093,12 +1128,190 @@ body {
     margin: 0;
 }
 
-.file-card-size {
-    display: none;
+
+/* ========== Markdown 内容样式 (GitHub风格紧凑版) ========== */
+.message-content.markdown-document {
+    background: #ffffff !important;
+    border: 1px solid #e1e4e8 !important;
+    /* 更淡的边框 */
+    border-radius: 6px !important;
+    padding: 32px !important;
+    width: 100% !important;
+    max-width: 850px !important;
+    box-shadow: none !important;
+    /* 去除阴影 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji" !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    color: #24292f !important;
+    display: block !important;
+    margin-top: 8px;
 }
 
-/* ========== Markdown 内容样式 ========== */
-.markdown-content h1,
+/* 关键修复！！重置 white-space，防止 HTML 源码中的换行符被渲染为可见空行 */
+.message-content.markdown-document .message-text {
+    white-space: normal !important;
+}
+
+/* 移除所有垂直外边距的干扰 */
+.message-content.markdown-document .message-text>*:first-child {
+    margin-top: 0 !important;
+}
+
+.message-content.markdown-document .message-text>*:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 调整文档模式下的 Markdown 元素样式 (紧凑布局) */
+.message-content.markdown-document h1 {
+    padding-bottom: 0.3em;
+    font-size: 2em;
+    border-bottom: 1px solid #eaecef;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.message-content.markdown-document h1:first-child {
+    margin-top: 0;
+}
+
+.message-content.markdown-document h2 {
+    padding-bottom: 0.3em;
+    font-size: 1.5em;
+    border-bottom: 1px solid #eaecef;
+    margin-top: 20px;
+    /* 稍微减小间距 */
+    margin-bottom: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.message-content.markdown-document h3 {
+    font-size: 1.25em;
+    margin-top: 18px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.message-content.markdown-document h4 {
+    font-size: 1em;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.message-content.markdown-document p {
+    margin-top: 0;
+    margin-bottom: 10px;
+    /* 减小段落间距 */
+}
+
+/* 列表样式紧凑化 - 类似 GitHub 的极简风格 */
+.message-content.markdown-document ul,
+.message-content.markdown-document ol {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    padding-left: 24px !important;
+}
+
+.message-content.markdown-document li {
+    margin: 0 !important;
+    line-height: 1.5 !important;
+    /* 保持标准行高 */
+}
+
+/* 关键修复：强制去除列表项内段落的边距，解决 loose list 导致的巨大间隙 */
+.message-content.markdown-document li>p {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    display: inline;
+    /* 让包含段落的列表项看起来像普通列表项 */
+}
+
+/* 嵌套列表无间距 */
+.message-content.markdown-document li>ul,
+.message-content.markdown-document li>ol {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* 移除列表项中最后一个元素的底部边距 */
+.message-content.markdown-document li> :last-child {
+    margin-bottom: 0 !important;
+}
+
+.message-content.markdown-document blockquote {
+    margin: 0 0 16px;
+    padding: 0 1em;
+    color: #57606a;
+    border-left: 0.25em solid #d0d7de;
+}
+
+.message-content.markdown-document code {
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: rgba(175, 184, 193, 0.2);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+.message-content.markdown-document pre {
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.message-content.markdown-document pre code {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    font-size: 100%;
+    word-break: normal;
+    white-space: pre;
+}
+
+.message-content.markdown-document hr {
+    height: 0.25em;
+    padding: 0;
+    margin: 20px 0;
+    background-color: #e1e4e8;
+    border: 0;
+}
+
+.message-content.markdown-document table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    margin-top: 0;
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+.message-content.markdown-document table th,
+.message-content.markdown-document table td {
+    padding: 6px 13px;
+    border: 1px solid #d0d7de;
+}
+
+.message-content.markdown-document table th {
+    font-weight: 600;
+    background-color: #f6f8fa;
+}
+
+.message-content.markdown-document table tr:nth-child(2n) {
+    background-color: #f6f8fa;
+}
+
+/* 兼容原有 .markdown-content 样式 (用于普通聊天气泡中的 markdown) */
+.markdown-content:not(.markdown-document) h1,
 .markdown-content h2,
 .markdown-content h3,
 .markdown-content h4 {
@@ -1221,47 +1434,58 @@ body {
     font-weight: 600;
 }
 
-/* ========== 思考中加载动画 ========== */
-.ai-message .message-content.thinking-bubble .thinking-text {
-    font-size: 14px !important;
-    line-height: 1.6 !important;
-    color: var(--text-primary);
-    font-weight: 400;
+/* ========== Typing Indicator Animation ========== */
+.message-content.loading-bubble {
+    padding: 12px 18px;
+    border-radius: 12px;
+    border-bottom-left-radius: 2px;
 }
 
-.ai-message .message-content.thinking-bubble .thinking-dots::after {
-    content: '...';
-    display: inline-block;
-    animation: thinkingDots 1.5s infinite;
-    font-size: 14px !important;
-    font-weight: bold;
-    line-height: 1.6 !important;
-    color: var(--text-primary);
-    letter-spacing: 1px;
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
 }
 
-@keyframes thinkingDots {
+.typing-indicator span {
+    display: block;
+    width: 6px;
+    height: 6px;
+    background-color: var(--text-secondary);
+    border-radius: 50%;
+    opacity: 0.6;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes bounce {
 
     0%,
-    20% {
-        content: '.  ';
-    }
-
-    40%,
-    60% {
-        content: '.. ';
-    }
-
+    80%,
     100% {
-        content: '...';
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
     }
 }
 
 /* ========== 右侧边栏样式 ========== */
 .right-sidebar {
     width: 340px;
-    background: #ffffff;
-    border-left: 1px solid #e5e5e5;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255, 255, 255, 0.5);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -1269,9 +1493,9 @@ body {
     right: 0;
     top: 0;
     flex-shrink: 0;
-    z-index: 20;
-    transition: transform 0.3s ease;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
+    z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: -2px 0 20px rgba(0, 0, 0, 0.02);
 }
 
 .right-sidebar.collapsed {
@@ -1280,11 +1504,11 @@ body {
 
 .right-sidebar-header {
     padding: 20px 24px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.6);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .right-sidebar-header h3 {
@@ -1310,7 +1534,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
-    background: #f8fafc;
+    background: transparent;
 }
 
 /* 仪表盘空状态 */
