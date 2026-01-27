@@ -1,0 +1,120 @@
+/* 复用 common.css 和 main.css 的大部分样式，仅做差异化覆盖 */
+
+/* 客服专属配色：清新绿 */
+:root {
+    --agent-primary: #11998e;
+    --agent-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+/* 覆盖 AI 头像和气泡颜色（仅针对客服页面） */
+.ai-message .message-avatar {
+    background: var(--agent-gradient) !important;
+}
+
+/* 侧边栏“新建会话”按钮颜色 */
+#new-agent-chat-btn {
+    background: var(--agent-gradient);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(17, 153, 142, 0.2);
+}
+
+#new-agent-chat-btn:hover {
+    background: linear-gradient(135deg, #0e857b 0%, #30cf6c 100%);
+    box-shadow: 0 6px 16px rgba(17, 153, 142, 0.3);
+}
+
+#new-agent-chat-btn svg {
+    stroke: white;
+}
+
+/* 历史记录选中态 */
+.chat-item.active {
+    background: linear-gradient(135deg, rgba(17, 153, 142, 0.1) 0%, rgba(56, 239, 125, 0.1) 100%) !important;
+    border: 1px solid rgba(17, 153, 142, 0.2) !important;
+}
+
+.chat-item.active .chat-title {
+    color: var(--agent-primary) !important;
+}
+
+.chat-item.active .chat-meta {
+    color: var(--agent-primary) !important;
+}
+
+/* 输入框区域微调 */
+/* 输入框区域微调 */
+.chat-input-container {
+    /* 已经通过内联样式在 HTML 中覆盖了位置 */
+    border-top: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding-bottom: 20px !important;
+    pointer-events: none;
+    /* 让容器不遮挡点击 */
+}
+
+/* 恢复输入框内部的点击事件 */
+.chat-input-wrapper {
+    pointer-events: auto;
+    background: #ffffff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    /* 添加阴影使其更立体 */
+}
+
+.send-btn {
+    background: var(--agent-gradient) !important;
+    pointer-events: auto;
+    /* 确保按钮可点击 */
+    z-index: 100;
+    /* 提升层级 */
+    cursor: pointer !important;
+}
+
+.send-btn:hover {
+    box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4) !important;
+}
+
+/* 修复气泡换行过多的问题 */
+.message-text p {
+    margin: 4px 0 !important;
+    /* 减小段落间距 */
+}
+
+.message-text p:first-child {
+    margin-top: 0 !important;
+}
+
+.message-text p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 确保主内容区域也是透明背景 */
+.main-content {
+    background: transparent !important;
+}
+
+/* ========================================= */
+/* 核心布局修复：让聊天区域像主页一样宽敞 */
+/* ========================================= */
+
+/* 1. 增加消息容器的最大宽度 - 严格按照 main.css 设置 */
+.chat-messages {
+    max-width: 900px !important;
+    width: 100% !important;
+    padding: 24px !important;
+    /* 按照 main.css 是 24px */
+    padding-bottom: 200px !important;
+    /* 按照 main.css 是 200px */
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+}
+
+
+.ai-message .message-content {
+    max-width: 100% !important;
+    /* 按照 main.css 是 100% */
+}
+
+/* 保持 markdown 文档的标准宽度，不要覆盖 */
+/* main.css 中已经定义了 .message-content.markdown-document 为 850px */

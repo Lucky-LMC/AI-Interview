@@ -817,6 +817,14 @@ function setupEventListeners() {
         });
     }
 
+    // 智能面试助手按钮
+    const interviewAgentBtn = document.getElementById('interview-agent-btn');
+    if (interviewAgentBtn) {
+        interviewAgentBtn.addEventListener('click', () => {
+            window.location.href = 'interview-agent.html';
+        });
+    }
+
     // 上传简历按钮
     const attachFileBtn = document.getElementById('attach-file-btn');
     const resumeFileInput = document.getElementById('resume-file-input');
