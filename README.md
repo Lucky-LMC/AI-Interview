@@ -8,8 +8,9 @@
 
 - **🔄 LangGraph 工作流架构**：采用专业的 Agent 工作流设计，实现从简历解析到报告生成的完整面试逻辑
 - **📊 工作流可视化**：支持生成工作流结构图，清晰展示节点间的流转关系
-- **🤖 多 Agent 协作**：面试官 Agent、教练 Agent 分工明确，各司其职
-- **🔍 智能资源推荐**：基于 Tavily 搜索引擎，自动搜索并推荐真实的学习资源（书籍/课程/文档）
+- **🤖 多 Agent 协作**：面试官 Agent、教练 Agent、客服 Agent 分工明确，各司其职
+- **� 智能客服助手**：专门的 RAG 客服 Agent，解答面试流程、技巧等问题，支持私有知识库 + 联网搜索兜底
+- **�🔍 智能资源推荐**：基于 Tavily 搜索引擎，自动搜索并推荐真实的学习资源（书籍/课程/文档）
 - **💬 交互式面试**：支持多轮问答，基于简历项目经验提出针对性问题
 - **📝 完整面试报告**：面试结束后自动生成包含优势分析、不足改进、简历优化的完整报告
 - **🎨 极致 UI 体验**：采用 **Glassmorphism（玻璃拟态）** 设计风格，配合磨砂玻璃侧边栏和流光动态效果
@@ -33,15 +34,15 @@
 - **通信**: RESTful API + `fetch`
 - **特性**: 响应式布局、动态流光效果、无阴影极简气泡、全屏沉浸体验
 
-### 工作流架构图
+### 系统架构全览图
 
-系统采用 LangGraph 工作流引擎，实现了完整的面试流程自动化：
+系统包含两大核心工作流：主面试流程 和 智能客服流程。
 
 <div align="center">
-    <img src="workflow_graph.png" alt="AI智能面试工作流程图" width="350" />
+    <img src="system_architecture_graph.png" alt="AI智能面试系统全览图" width="350" />
 </div>
 
-**工作流说明**：
+**1. 主面试工作流（左图）**：
 1. **START** → **parse_resume**（简历解析节点）：解析 PDF/Word 格式简历，提取关键信息
 2. **parse_resume** → **interviewer_agent**（面试官 Agent）：基于简历生成针对性问题
 3. **interviewer_agent** → **answer**（用户回答节点）：等待用户输入答案（中断点）
@@ -50,7 +51,14 @@
 6. **coach_agent** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
 7. **generate_report** → **END**：流程结束
 
-> 💡 **提示**：运行 `python backend/test_graph_visualization.py` 可在项目根目录生成最新的工作流可视化图
+**2. 智能客服工作流（右图）**：
+- 专门处理用户的咨询问题（如"面试流程是什么"、"如何准备自我介绍"）
+- 采用 **RAG（检索增强生成）** 策略：
+  1. 优先检索 **私有知识库**（FAQ文档）
+  2. 若无结果，自动降级调用 **联网搜索** 工具
+- 独立于主面试流程运行，提供随时随地的帮助
+
+> 💡 **提示**：运行 `python backend/utils/workflow_visualizer.py` 可在项目根目录生成最新的系统全览图
 
 ## 📂 项目结构
 
@@ -65,6 +73,7 @@ Interview/
 │   │   ├── agents/           # Agent 定义
 │   │   │   ├── interviewer_agent.py  # 面试官 Agent
 │   │   │   ├── coach_agent.py        # 教练 Agent（搜索资源）
+│   │   │   ├── customer_service_agent.py # 客服 Agent（RAG + 搜索）
 │   │   │   └── __init__.py
 │   │   ├── nodes/            # 工作流节点
 │   │   │   ├── parse_resume_node.py      # 简历解析节点
@@ -99,9 +108,9 @@ Interview/
 │   │   └── __init__.py
 │   ├── utils/               # 工具函数
 │   │   ├── pdf_parser.py   # PDF 解析工具
+│   │   ├── workflow_visualizer.py # 工作流可视化工具
 │   │   └── __init__.py
 │   ├── main.py              # 应用入口
-│   └── test_graph_visualization.py  # 工作流可视化脚本
 ├── frontend/                # 前端代码
 │   ├── index.html          # 登录页面
 │   ├── register.html       # 注册页面
@@ -120,7 +129,7 @@ Interview/
 ├── checkpoints-sqlite/     # SQLite 持久化存储
 ├── .env                    # 环境变量配置（需自行创建）
 ├── requirements.txt        # Python 依赖
-├── workflow_graph.png      # 工作流可视化图
+├── system_architecture_graph.png # 系统架构全览图
 ├── Git操作指南.md          # Git 使用指南
 └── README.md              # 项目说明
 ```
@@ -215,12 +224,12 @@ python main.py
 
 ### 6. 可视化工作流（可选）
 ```bash
-# 生成工作流可视化图（保存到项目根目录）
-python backend/test_graph_visualization.py
+# 生成系统全览图（保存到项目根目录）
+python backend/utils/workflow_visualizer.py
 ```
 
 生成的图片将保存到项目根目录：
-- `workflow_graph.png`：完整版工作流图
+- `system_architecture_graph.png`：包含面试工作流和客服 Agent 的系统全览图
 
 ## 📖 使用说明
 
