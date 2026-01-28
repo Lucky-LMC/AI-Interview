@@ -39,7 +39,7 @@
 系统包含两大核心工作流：主面试流程 和 智能客服流程。
 
 <div align="center">
-    <img src="system_architecture_graph.png" alt="AI智能面试系统全览图" width="350" />
+    <img src="system_architecture_graph.png" alt="AI智能面试系统全览图" width="500" />
 </div>
 
 **1. 主面试工作流（左图）**：
