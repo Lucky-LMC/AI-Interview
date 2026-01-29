@@ -6,7 +6,36 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 
 
-# ========== 工作流请求模型 ==========
+# ========== 1. 用户认证模型 (Auth) ==========
+
+class UserBase(BaseModel):
+    """用户公共字段"""
+    user_name: str = Field(..., description="用户名", min_length=3, max_length=64)
+
+
+# ========== 1. 用户认证模型 (Auth) ==========
+
+# --- Requests ---
+
+class UserRegisterRequest(UserBase):
+    """用户注册请求"""
+    password: str = Field(..., description="密码", min_length=3, max_length=128)
+
+
+class UserLoginRequest(UserBase):
+    """用户登录请求"""
+    password: str = Field(..., description="密码", min_length=3, max_length=128)
+
+# --- Responses ---
+
+class UserResponse(UserBase):
+    """用户操作响应"""
+    message: str = Field(..., description="提示信息")
+
+
+# ========== 2. 面试核心流程模型 (Interview Core) ==========
+
+# --- Requests ---
 
 class SubmitAnswerRequest(BaseModel):
     """提交答案请求"""
@@ -14,8 +43,7 @@ class SubmitAnswerRequest(BaseModel):
     answer: str = Field(..., description="用户回答", min_length=1)
     user_name: Optional[str] = Field(None, description="用户名（可选，用于保存记录）")
 
-
-# ========== 响应模型 ==========
+# --- Responses ---
 
 class StartInterviewResponse(BaseModel):
     """启动面试响应"""
@@ -36,29 +64,9 @@ class InterviewStatusResponse(BaseModel):
     round: int = Field(..., description="当前轮次")
 
 
-# ========== 用户认证模型 ==========
+# ========== 3. 面试记录模型 (Records) ==========
 
-class UserBase(BaseModel):
-    """用户公共字段"""
-    user_name: str = Field(..., description="用户名", min_length=3, max_length=64)
-
-
-class UserRegisterRequest(UserBase):
-    """用户注册请求"""
-    password: str = Field(..., description="密码", min_length=3, max_length=128)
-
-
-class UserLoginRequest(UserBase):
-    """用户登录请求"""
-    password: str = Field(..., description="密码", min_length=3, max_length=128)
-
-
-class UserResponse(UserBase):
-    """用户操作响应"""
-    message: str = Field(..., description="提示信息")
-
-
-# ========== 面试记录模型 ==========
+# --- Responses ---
 
 class InterviewRecordListResponse(BaseModel):
     """面试记录列表响应"""
@@ -74,3 +82,20 @@ class InterviewRecordDetailResponse(BaseModel):
     report: Optional[str] = Field(None, description="最终报告")
     is_finished: bool = Field(..., description="面试是否完成")
     created_at: str = Field(..., description="创建时间")
+
+
+# ========== 4. 智能顾问模型 (Consultant) ==========
+
+# --- Requests ---
+
+class ChatRequest(BaseModel):
+    """聊天请求模型"""
+    message: str = Field(..., description="用户消息")
+    user_name: str = Field("User", description="用户名")
+
+# --- Responses ---
+
+class ChatResponse(BaseModel):
+    """聊天响应模型"""
+    reply: str = Field(..., description="Agent 回复")
+    success: bool = Field(True, description="是否成功")

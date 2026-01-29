@@ -1,4 +1,4 @@
-/* 复用 common.css 和 main.css 的大部分样式，仅做差异化覆盖 */
+/* 复用 common.css 和 interview.css 的大部分样式，仅做差异化覆盖 */
 
 /* 客服专属配色：清新绿 */
 :root {
@@ -98,14 +98,14 @@
 /* 核心布局修复：让聊天区域像主页一样宽敞 */
 /* ========================================= */
 
-/* 1. 增加消息容器的最大宽度 - 严格按照 main.css 设置 */
+/* 1. 增加消息容器的最大宽度 - 严格按照 interview.css 设置 */
 .chat-messages {
     max-width: 900px !important;
     width: 100% !important;
     padding: 24px !important;
-    /* 按照 main.css 是 24px */
+    /* 按照 interview.css 是 24px */
     padding-bottom: 200px !important;
-    /* 按照 main.css 是 200px */
+    /* 按照 interview.css 是 200px */
     margin: 0 auto !important;
     box-sizing: border-box !important;
 }
@@ -113,8 +113,8 @@
 
 .ai-message .message-content {
     max-width: 100% !important;
-    /* 按照 main.css 是 100% */
+    /* 按照 interview.css 是 100% */
 }
 
 /* 保持 markdown 文档的标准宽度，不要覆盖 */
-/* main.css 中已经定义了 .message-content.markdown-document 为 850px */
+/* interview.css 中已经定义了 .message-content.markdown-document 为 850px */

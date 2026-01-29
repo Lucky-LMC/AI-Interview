@@ -5,11 +5,11 @@
 """
 from langgraph.prebuilt import create_react_agent
 from backend.graph.llm import openai_llm
-from backend.graph.tools.coach_tools import coach_tools
+from backend.graph.tools.feedback_tools import feedback_tools
 
 
 # Agent 系统提示词
-COACH_AGENT_PROMPT = """你是一位面试教练和资源推荐专家。
+FEEDBACK_AGENT_PROMPT = """你是一位面试反馈和资源推荐专家。
 
 ## 🎯 你的任务
 阅读用户的**面试记录（问题与回答）**，分析候选人在哪些技术点上表现薄弱，并针对性地搜索学习资源。
@@ -44,17 +44,17 @@ A: 我不太清楚具体细节..."
 """
 
 
-def create_coach_agent():
+def create_feedback_agent():
     """
-    创建面试教练 Agent
+    创建面试反馈 Agent
     """
     agent = create_react_agent(
         model=openai_llm,
-        tools=coach_tools,
-        prompt=COACH_AGENT_PROMPT
+        tools=feedback_tools,
+        prompt=FEEDBACK_AGENT_PROMPT
     )
     return agent
 
 
 # 创建全局 Agent 实例
-coach_agent = create_coach_agent()
+feedback_agent = create_feedback_agent()

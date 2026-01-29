@@ -1,15 +1,15 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """
-智能面试客服 Agent - 负责回答用户关于面试的咨询
+面试顾问 Agent - 负责回答用户关于面试的咨询
 采用"优先私有知识库 + 兜底联网搜索"的双工具策略
 """
 from langgraph.prebuilt import create_react_agent
 from backend.graph.llm import openai_llm
-from backend.graph.tools.knowledge_base_tool import customer_service_tools
+from backend.graph.tools.consultant_tools import consultant_tools
 
 
 # Agent 系统提示词
-CUSTOMER_SERVICE_AGENT_PROMPT = """你是一位专业的面试客服助手。你的职责是：
+CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是：
 1. 回答用户关于面试流程、面试技巧、简历优化等问题
 2. 提供专业、友好的建议
 3. 模拟面试场景，帮助用户练习
@@ -50,20 +50,20 @@ CUSTOMER_SERVICE_AGENT_PROMPT = """你是一位专业的面试客服助手。你
 """
 
 
-def create_customer_service_agent():
+def create_consultant_agent():
     """
-    创建智能面试客服 Agent
+    创建面试顾问 Agent
     
     使用 LangGraph 的 create_react_agent 创建一个可以调用工具的 Agent
     返回的是一个 CompiledGraph
     """
     agent = create_react_agent(
         model=openai_llm,
-        tools=customer_service_tools,
-        prompt=CUSTOMER_SERVICE_AGENT_PROMPT
+        tools=consultant_tools,
+        prompt=CONSULTANT_AGENT_PROMPT
     )
     return agent
 
 
 # 创建全局 Agent 实例
-customer_service_agent = create_customer_service_agent()
+consultant_agent = create_consultant_agent()

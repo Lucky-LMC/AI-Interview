@@ -1,6 +1,6 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """
-面试教练工具定义
+面试反馈工具定义
 包含学习资源搜索工具
 """
 from langchain_core.tools import tool
@@ -53,4 +53,4 @@ def search_learning_resources(topic: str) -> str:
 
 
 # 导出工具列表
-coach_tools = [search_learning_resources]
+feedback_tools = [search_learning_resources]

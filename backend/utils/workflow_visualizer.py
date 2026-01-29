@@ -41,8 +41,8 @@ def generate_combined_graph(show_window=False):
         },
         {
             "name": "客服 Agent",
-            "import": lambda: __import__('backend.graph.agents.customer_service_agent', fromlist=['customer_service_agent']).customer_service_agent,
-            "title": "面试客服 Agent 流程"
+            "import": lambda: __import__('backend.graph.agents.consultant_agent', fromlist=['consultant_agent']).consultant_agent,
+            "title": "面试顾问 Agent 流程"
         }
     ]
     

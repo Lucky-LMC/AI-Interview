@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 检查是否已登录
     const auth = getAuth();
     if (auth && auth.isAuthenticated) {
-        window.location.href = 'main.html';
+        window.location.href = 'interview.html';
         return;
     }
 

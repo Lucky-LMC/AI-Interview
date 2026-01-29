@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routes import interview_router, auth_router
-from backend.routes.customer_service_routes import router as customer_service_router
+from backend.routes.consultant_routes import router as customer_service_router
 from backend.config import init_db
 
 # 创建 FastAPI 应用

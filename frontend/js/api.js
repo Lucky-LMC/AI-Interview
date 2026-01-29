@@ -72,12 +72,12 @@ function showError(target, message) {
                 element.classList.remove('show');
             }, 5000);
         } else {
-            // 如果找不到元素，且是在聊天页面，可能需要调用 addMessage（但这里无法直接调用 main.js 的函数）
+            // 如果找不到元素，且是在聊天页面，可能需要调用 addMessage（但这里无法直接调用 interview.js 的函数）
             // 所以这里只处理基于 elementId 的错误显示，或者 alert
             alert(`错误: ${message}`);
         }
     } else {
-        // 在 main.js 里被重写或者调用
+        // 在 interview.js 里被重写或者调用
         console.error(message);
         alert(message);
     }

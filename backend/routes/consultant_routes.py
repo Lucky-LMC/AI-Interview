@@ -1,25 +1,14 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """
-智能面试客服 API 路由
+智能面试顾问 API 路由
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from backend.graph.agents.customer_service_agent import customer_service_agent
+from backend.graph.agents.consultant_agent import consultant_agent
 from langchain_core.messages import HumanMessage
+from backend.models.schemas import ChatRequest, ChatResponse
 
 router = APIRouter(prefix="/api/customer-service", tags=["customer-service"])
-
-
-class ChatRequest(BaseModel):
-    """聊天请求模型"""
-    message: str
-    user_name: str = "User"
-
-
-class ChatResponse(BaseModel):
-    """聊天响应模型"""
-    reply: str
-    success: bool = True
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -39,7 +28,7 @@ async def chat_with_agent(request: ChatRequest):
         
         # 调用 Agent（LangGraph CompiledGraph）
         # 使用 invoke 方法，传入消息列表
-        result = customer_service_agent.invoke({
+        result = consultant_agent.invoke({
             "messages": [HumanMessage(content=request.message)]
         })
         

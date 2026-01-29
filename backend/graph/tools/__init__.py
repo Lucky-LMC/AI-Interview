@@ -6,15 +6,15 @@ from backend.graph.tools.interviewer_tools import (
     search_interview_questions,
     interviewer_tools
 )
-from backend.graph.tools.coach_tools import (
+from backend.graph.tools.feedback_tools import (
     search_learning_resources,
-    coach_tools
+    feedback_tools
 )
 
 __all__ = [
     "search_interview_questions",
     "interviewer_tools",
     "search_learning_resources",
-    "coach_tools"
+    "feedback_tools"
 ]
 

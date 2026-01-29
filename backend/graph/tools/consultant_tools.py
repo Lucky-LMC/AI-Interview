@@ -188,4 +188,4 @@ def tavily_search(query: str) -> str:
 
 
 # 导出工具列表（顺序很重要！优先使用知识库）
-customer_service_tools = [search_knowledge_base, tavily_search]
+consultant_tools = [search_knowledge_base, tavily_search]

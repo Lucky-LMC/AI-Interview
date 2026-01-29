@@ -1,18 +1,18 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """
 搜索学习资源节点
-调用 Coach Agent 搜索学习资源
+调用 Feedback Agent 搜索学习资源
 """
 from langchain_core.messages import HumanMessage
 from backend.graph.state import InterviewState
-from backend.graph.agents import coach_agent
+from backend.graph.agents import feedback_agent
 
 
-def coach_node(state: InterviewState) -> InterviewState:
+def feedback_node(state: InterviewState) -> InterviewState:
     """
     搜索学习资源节点：
     1. 分析面试记录，提取候选人的主要不足
-    2. 调用 Coach Agent 搜索学习资源
+    2. 调用 Feedback Agent 搜索学习资源
     """
     history = state.get('history', [])
     
@@ -43,10 +43,10 @@ def coach_node(state: InterviewState) -> InterviewState:
 注意：必须调用工具搜索，不要自己编造资源。
 """
         
-        print("[search_resources_node] 正在调用 Coach Agent 搜索学习资源...")
+        print("[search_resources_node] 正在调用 Feedback Agent 搜索学习资源...")
         
         # 调用 Agent（输入简短，任务明确）
-        result = coach_agent.invoke({"messages": [HumanMessage(content=user_message)]})
+        result = feedback_agent.invoke({"messages": [HumanMessage(content=user_message)]})
         
         # 提取搜索结果
         search_results = result["messages"][-1].content

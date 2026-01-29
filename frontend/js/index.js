@@ -69,7 +69,7 @@ async function handleLogin() {
         }
 
         hideLoading();
-        window.location.href = 'main.html';
+        window.location.href = 'interview.html';
     } catch (error) {
         hideLoading();
         showError('login-error', `登录失败：${error.message}`);
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 检查是否已登录
     const auth = getAuth();
     if (auth && auth.isAuthenticated) {
-        window.location.href = 'main.html';
+        window.location.href = 'interview.html';
         return;
     }
 
