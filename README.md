@@ -116,16 +116,19 @@ Interview/
 │   ├── index.html          # 登录页面
 │   ├── register.html       # 注册页面
 │   ├── interview.html      # 主页面（面试界面）
+│   ├── consultant.html     # 顾问页面
 │   ├── css/                # 样式文件
 │   │   ├── common.css      # 公共样式
 │   │   ├── index.css       # 登录页样式
 │   │   ├── register.css    # 注册页样式
-│   │   └── interview.css   # 主页样式
+│   │   ├── interview.css   # 主页样式
+│   │   └── consultant.css  # 顾问页样式
 │   └── js/                 # JavaScript 脚本
 │       ├── api.js          # API 请求封装
 │       ├── index.js        # 登录逻辑
 │       ├── register.js     # 注册逻辑
-│       └── interview.js    # 面试逻辑
+│       ├── interview.js    # 面试逻辑
+│       └── consultant.js   # 顾问逻辑
 ├── uploads/                # 简历文件存储目录
 ├── checkpoints-sqlite/     # SQLite 持久化存储
 ├── .env                    # 环境变量配置（需自行创建）

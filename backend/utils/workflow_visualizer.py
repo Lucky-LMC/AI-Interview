@@ -42,7 +42,7 @@ def generate_combined_graph(show_window=False):
         {
             "name": "客服 Agent",
             "import": lambda: __import__('backend.graph.agents.consultant_agent', fromlist=['consultant_agent']).consultant_agent,
-            "title": "面试顾问 Agent 流程"
+            "title": "面试顾问智能体\n(consultant_agent)"
         }
     ]
     
