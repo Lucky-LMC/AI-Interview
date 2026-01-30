@@ -33,6 +33,12 @@ class InterviewRecord(Base):
     # 简历文本
     resume_text = Column(Text, nullable=False, comment="简历文本内容")
     
+    # 简历文件路径（存储上传的PDF文件路径）
+    resume_file_path = Column(String(512), nullable=True, comment="简历PDF文件路径")
+    
+    # 简历原始文件名（用于前端显示）
+    resume_file_name = Column(String(255), nullable=True, comment="简历原始文件名")
+    
     # 面试记录（JSON格式）
     # 格式: [{"question": "", "answer": ""}, ...]
     history = Column(JSON, nullable=False, default=list, comment="面试记录（JSON格式）")

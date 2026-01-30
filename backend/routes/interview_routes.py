@@ -8,6 +8,7 @@ import uuid
 import shutil
 import tempfile
 import json
+import sqlite3
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Header, Depends
 from fastapi.responses import StreamingResponse, FileResponse
 from pathlib import Path
@@ -30,6 +31,10 @@ router = APIRouter(prefix="/api/interview", tags=["interview"])
 # PDF文件存储目录
 UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
+
+# LangGraph checkpoints 数据库路径
+CHECKPOINTS_DIR = Path(__file__).parent.parent.parent / "checkpoints-sqlite"
+CHECKPOINT_DB = CHECKPOINTS_DIR / "checkpoints.sqlite"
 
 
 def get_db():
@@ -101,6 +106,8 @@ async def start_interview(
                 thread_id=thread_id,
                 user_name=user_name,
                 resume_text=resume_text,
+                resume_file_path=str(pdf_file_path),  # 保存文件路径
+                resume_file_name=file.filename,  # 保存原始文件名
                 history=history,
                 report="",
                 is_finished=False
@@ -312,10 +319,18 @@ async def get_interview_record_detail(
         if not record:
             raise HTTPException(status_code=404, detail="面试记录不存在")
         
+        # 构建PDF文件访问URL（如果存在文件路径）
+        resume_file_url = None
+        if record.resume_file_path:
+            # 从完整路径中提取 thread_id
+            resume_file_url = f"/api/interview/resume/{record.thread_id}"
+        
         return InterviewRecordDetailResponse(
             thread_id=record.thread_id,
             user_name=record.user_name,
             resume_text=record.resume_text,
+            resume_file_url=resume_file_url,
+            resume_file_name=record.resume_file_name,  # 返回原始文件名
             history=record.history if record.history else [],
             report=record.report,
             is_finished=record.is_finished,
@@ -327,142 +342,69 @@ async def get_interview_record_detail(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取面试记录详情失败: {str(e)}")
 
-# @router.post("/submit/stream")
-# async def submit_answer_stream(
-#     request: SubmitAnswerRequest,
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     【流式输出接口】提交用户答案并流式返回 AI 反馈
-#     
-#     核心技术：
-#     1. SSE (Server-Sent Events) 协议：单向推送数据流
-#     2. LangGraph 的 astream_events：监听工作流中每个节点的事件
-#     3. 打字机效果：逐字符流式输出 LLM 生成的内容
-#     
-#     流程：
-#     1. 更新用户答案到工作流状态
-#     2. 恢复工作流执行（evaluator -> check_finish -> [interviewer/report]）
-#     3. 监听工作流事件，实时推送 LLM 输出
-#     4. 保存面试记录（如果面试结束）
-#     """
-#     async def generate_stream():
-#         """
-#         【异步生成器】生成 SSE 格式的数据流
-#         
-#         SSE 数据格式：
-#         - 每条消息以 "data: " 开头
-#         - 消息体是 JSON 字符串
-#         - 每条消息以 "\n\n" 结尾（两个换行符）
-#         
-#         示例：
-#         data: {"type": "feedback_start"}\n\n
-#         data: {"type": "feedback", "content": "您"}\n\n
-#         data: {"type": "feedback", "content": "的"}\n\n
-#         data: {"type": "feedback", "content": "回答"}\n\n
-#         """
-#         try:
-#             # ========== 步骤1：初始化工作流 ==========
-#             workflow = create_interview_graph()
-#             config = {"configurable": {"thread_id": request.thread_id}}
-#             
-#             # ========== 步骤2：更新用户回答到工作流状态 ==========
-#             current_state = workflow.get_state(config)
-#             if not current_state.values:
-#                 yield f"data: {json.dumps({'error': '会话不存在'}, ensure_ascii=False)}\n\n"
-#                 return
-#             
-#             history = current_state.values.get('history', [])
-#             resume_text = current_state.values.get('resume_text', '')
-#             
-#             if history:
-#                 history[-1]['answer'] = request.answer
-#                 workflow.update_state(config, {"history": history})
-#             
-#             # ========== 步骤3：执行工作流 (非流式执行) ==========
-#             # 直接等待工作流执行完成，获取最终结果
-#             result = await workflow.ainvoke(None, config)
-#             
-#             # ========== 步骤4：处理执行结果并推送 ==========
-#             
-#             # 4.1 获取反馈 (Evaluator 生成的)
-#             # 反馈通常在 history 的倒数第二条（如果是新的一轮）或者最后一条（如果结束了）
-#             # 我们遍历 history 找到最新的 feedback
-#             result_history = result.get('history', [])
-#             latest_feedback = ""
-#             if result_history:
-#                 # 从后往前找有 feedback 的记录
-#                 for entry in reversed(result_history):
-#                     if entry.get('feedback'):
-#                         latest_feedback = entry.get('feedback')
-#                         break
-#             
-#             if latest_feedback:
-#                 yield f"data: {json.dumps({'type': 'feedback_start'}, ensure_ascii=False)}\n\n"
-#                 yield f"data: {json.dumps({'type': 'feedback', 'content': latest_feedback}, ensure_ascii=False)}\n\n"
-#                 yield f"data: {json.dumps({'type': 'feedback_end'}, ensure_ascii=False)}\n\n"
-#             
-#             # 4.2 检查是否结束
-#             is_finished = result.get('is_finished', False)
-#             round_num = result.get('round', 0)
-#             
-#             if is_finished:
-#                 # ========== 面试结束 ==========
-#                 final_report = result.get('report', '')
-#                 
-#                 # 推送报告
-#                 yield f"data: {json.dumps({'type': 'report_start'}, ensure_ascii=False)}\n\n"
-#                 yield f"data: {json.dumps({'type': 'report', 'content': final_report}, ensure_ascii=False)}\n\n"
-#                 yield f"data: {json.dumps({'type': 'report_end'}, ensure_ascii=False)}\n\n"
-#                 
-#                 # 保存记录
-#                 try:
-#                     new_record = InterviewRecord(
-#                         thread_id=request.thread_id,
-#                         user_name=request.user_name,
-#                         resume_text=resume_text,
-#                         history=result_history,
-#                         report=final_report
-#                     )
-#                     db.add(new_record)
-#                     db.commit()
-#                 except Exception as e:
-#                     db.rollback()
-#                     print(f"保存面试记录失败: {e}")
-#                 
-#                 yield f"data: {json.dumps({'type': 'finished', 'round': round_num}, ensure_ascii=False)}\n\n"
-#                 
-#             else:
-#                 # ========== 面试继续 ==========
-#                 # 获取新生成的问题
-#                 latest_question = ""
-#                 if result_history:
-#                     latest_question = result_history[-1].get('question', '')
-#                 
-#                 if latest_question:
-#                     yield f"data: {json.dumps({'type': 'question_start'}, ensure_ascii=False)}\n\n"
-#                     yield f"data: {json.dumps({'type': 'question', 'content': latest_question}, ensure_ascii=False)}\n\n"
-#                     yield f"data: {json.dumps({'type': 'question_end'}, ensure_ascii=False)}\n\n"
-#                 
-#                 yield f"data: {json.dumps({'type': 'continue', 'round': round_num + 1}, ensure_ascii=False)}\n\n"
-#             
-#             # ========== 步骤5：推送结束标记 ==========
-#             yield "data: [DONE]\n\n"
-#             
-#         except Exception as e:
-#             import traceback
-#             traceback.print_exc()
-#             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
-#     
-#     # ========== 返回 StreamingResponse ==========
-#     # StreamingResponse 是 FastAPI 提供的流式响应类
-#     # media_type="text/event-stream" 表示使用 SSE 协议
-#     return StreamingResponse(
-#         generate_stream(),  # 传入异步生成器
-#         media_type="text/event-stream",  # SSE 协议的 MIME 类型
-#         headers={
-#             "Cache-Control": "no-cache",  # 禁用缓存（确保实时推送）
-#             "Connection": "keep-alive",  # 保持连接（SSE 需要长连接）
-#             "X-Accel-Buffering": "no"  # 禁用 nginx 缓冲（如果使用 nginx 反向代理）
-#         }
-#     )
+
+@router.delete("/records/{thread_id}")
+async def delete_interview_record(
+    thread_id: str,
+    user_name: Optional[str] = Header(None, alias="X-User-Name"),
+    db: Session = Depends(get_db)
+):
+    """
+    删除面试记录
+    
+    删除步骤：
+    1. 验证用户权限（只能删除自己的记录）
+    2. 删除数据库记录
+    3. 删除 PDF 文件
+    4. 删除 LangGraph 会话记录
+    """
+    if not user_name:
+        raise HTTPException(status_code=401, detail="需要登录")
+    
+    try:
+        # 1. 查询记录（验证权限）
+        record = db.query(InterviewRecord).filter(
+            InterviewRecord.thread_id == thread_id,
+            InterviewRecord.user_name == user_name
+        ).first()
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="面试记录不存在或无权删除")
+        
+        # 2. 删除 PDF 文件
+        if record.resume_file_path:
+            pdf_path = Path(record.resume_file_path)
+            if pdf_path.exists():
+                try:
+                    pdf_path.unlink()
+                    print(f"[删除文件] 成功删除 PDF: {pdf_path}")
+                except Exception as e:
+                    print(f"[删除文件] 删除 PDF 失败: {e}")
+        
+        # 3. 删除 LangGraph 会话记录
+        try:
+            if CHECKPOINT_DB.exists():
+                conn = sqlite3.connect(str(CHECKPOINT_DB))
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+                cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+                conn.commit()
+                conn.close()
+                print(f"[删除检查点] 成功删除 thread_id={thread_id} 的会话记录")
+        except Exception as e:
+            print(f"[删除检查点] 删除会话记录失败: {e}")
+        
+        # 4. 删除数据库记录
+        db.delete(record)
+        db.commit()
+        
+        print(f"[删除记录] 成功删除面试记录: thread_id={thread_id}, user={user_name}")
+        
+        return {"message": "删除成功", "thread_id": thread_id}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"[删除记录] 删除失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除面试记录失败: {str(e)}")

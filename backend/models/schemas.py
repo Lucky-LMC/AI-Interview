@@ -78,6 +78,8 @@ class InterviewRecordDetailResponse(BaseModel):
     thread_id: str = Field(..., description="会话ID")
     user_name: str = Field(..., description="用户名")
     resume_text: str = Field(..., description="简历文本")
+    resume_file_url: Optional[str] = Field(None, description="简历PDF文件访问URL")
+    resume_file_name: Optional[str] = Field(None, description="简历原始文件名")
     history: List[Dict[str, str]] = Field(..., description="面试历史记录")
     report: Optional[str] = Field(None, description="最终报告")
     is_finished: bool = Field(..., description="面试是否完成")

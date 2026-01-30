@@ -71,6 +71,21 @@ async function getInterviewRecordDetailAPI(threadId) {
     });
 }
 
+// 删除面试记录 API
+async function deleteInterviewRecordAPI(threadId) {
+    const auth = getAuth();
+    if (!auth || !auth.userName) {
+        throw new Error('需要登录');
+    }
+
+    return await callAPI(`${API_BASE_URL}/records/${threadId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-User-Name': auth.userName
+        }
+    });
+}
+
 // ============================================
 // ========== UI 交互和工具函数 ==========
 // ============================================
@@ -570,10 +585,93 @@ async function renderInterviewRecords() {
         chatHistory.querySelectorAll('.chat-item').forEach(item => {
             const threadId = item.getAttribute('data-thread-id');
             if (threadId && threadId !== 'current') {
-                item.addEventListener('click', () => {
+                // 点击记录加载详情
+                item.addEventListener('click', (e) => {
+                    // 如果点击的是删除按钮，不触发加载
+                    if (e.target.classList.contains('chat-delete-btn')) {
+                        return;
+                    }
                     loadInterviewRecord(threadId);
                 });
             }
+        });
+
+        // 绑定删除按钮事件
+        chatHistory.querySelectorAll('.chat-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                const threadId = btn.getAttribute('data-thread-id');
+
+                if (confirm('确定要删除这条面试记录吗？删除后无法恢复！')) {
+                    try {
+                        showLoading('正在删除...');
+                        await deleteInterviewRecordAPI(threadId);
+                        hideLoading();
+
+                        // 如果删除的是当前查看的记录，清空聊天区域和状态
+                        if (currentViewingThreadId === threadId) {
+                            const chatMessages = document.getElementById('chat-messages');
+                            chatMessages.innerHTML = '';
+                            addMessage('ai', '面试记录已删除');
+                            currentViewingThreadId = null;
+
+                            // 清空面试状态
+                            interviewState = {
+                                threadId: null,
+                                resumeText: '',
+                                resumeFileUrl: null,
+                                currentQuestion: '',
+                                currentRound: 0,
+                                maxRounds: 3,
+                                isFinished: false,
+                                isReadOnly: false
+                            };
+
+                            // 清除localStorage
+                            localStorage.removeItem('interviewState');
+                        }
+
+                        // 如果删除的是localStorage中保存的会话，也要清除
+                        const savedStateStr = localStorage.getItem('interviewState');
+                        if (savedStateStr) {
+                            try {
+                                const savedState = JSON.parse(savedStateStr);
+                                if (savedState && savedState.threadId === threadId) {
+                                    localStorage.removeItem('interviewState');
+                                    interviewState = {
+                                        threadId: null,
+                                        resumeText: '',
+                                        resumeFileUrl: null,
+                                        currentQuestion: '',
+                                        currentRound: 0,
+                                        maxRounds: 3,
+                                        isFinished: false,
+                                        isReadOnly: false
+                                    };
+                                }
+                            } catch (e) {
+                                console.error('解析localStorage失败:', e);
+                            }
+                        }
+
+                        // 重新加载列表
+                        renderInterviewRecords();
+
+                        // 清空聊天区域，显示欢迎界面
+                        const chatMessages = document.getElementById('chat-messages');
+                        chatMessages.innerHTML = '';
+
+                        // 显示删除成功的消息和欢迎提示
+                        addMessage('ai', '✅ **面试记录已成功删除**\n\n您可以：\n\n1️⃣ **在此对话下继续**：直接点击下方的“上传简历”按钮，在当前对话中开始新的面试\n\n2️⃣ **新开一个面试**：点击左上角的“➕ 开始面试”按钮，创建全新的面试记录', false, false, true);
+
+                        // 重置右侧面试看板
+                        resetDashboard();
+                    } catch (error) {
+                        hideLoading();
+                        showError(`删除失败：${error.message}`);
+                    }
+                }
+            });
         });
 
     } catch (error) {
@@ -601,7 +699,7 @@ function createRecordItem(record) {
     item.innerHTML = `
         <div>
             <span class="chat-title">面试记录 ${threadIdShort}</span>
-            <button class="chat-menu-btn">⋯</button>
+            <button class="chat-delete-btn" data-thread-id="${record.thread_id}" title="删除记录">×</button>
         </div>
         <span class="chat-meta">${dateTimeStr}</span>
     `;
@@ -633,6 +731,17 @@ async function loadInterviewRecord(threadId) {
 
         // 更新右侧面试看板
         updateDashboard(record);
+
+        // 【新增】显示简历PDF文件卡片（如果有的话）
+        if (record.resume_file_url) {
+            const escapedText = record.resume_text ? record.resume_text.replace(/"/g, '&quot;') : '';
+            const pdfUrl = record.resume_file_url || '';
+            const fileName = record.resume_file_name || '简历文件.pdf';  // 使用真实文件名，如果没有则用默认名称
+
+            // 创建文件卡片HTML
+            const fileCardHtml = `<div class="file-card" data-resume="${escapedText}" data-pdf-url="${pdfUrl}"><span class="file-card-icon">📄</span><div class="file-card-info"><span class="file-card-name">${fileName}</span></div></div>`;
+            addMessage('user', fileCardHtml, false, true);
+        }
 
         // 显示简历内容
         if (record.resume_text) {
@@ -674,6 +783,7 @@ async function loadInterviewRecord(threadId) {
                 currentRound: record.history ? record.history.length : 0,
                 maxRounds: record.history ? record.history.length : 0,
                 resumeText: record.resume_text,
+                resumeFileUrl: record.resume_file_url || null,
                 lastFeedback: null,
                 finalReport: record.report,
                 isReadOnly: true
@@ -698,6 +808,7 @@ async function loadInterviewRecord(threadId) {
                 currentRound: record.history ? record.history.length : 0, // 轮次
                 maxRounds: 3, // 这里后端没存 max_rounds，暂时默认 3，或者得从后端取
                 resumeText: record.resume_text,
+                resumeFileUrl: record.resume_file_url || null,
                 lastFeedback: null,
                 finalReport: null,
                 isReadOnly: false
@@ -1078,4 +1189,12 @@ function updateDashboard(data) {
     `;
 
     dashboardContainer.innerHTML = metaCardHtml;
+}
+
+// 重置面试看板
+function resetDashboard() {
+    const dashboardContainer = document.getElementById('dashboard-container');
+    if (!dashboardContainer) return;
+
+    dashboardContainer.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 40px 0;">暂无面试进行中</div>';
 }
