@@ -100,7 +100,7 @@ def search_knowledge_base(query: str) -> str:
     Returns:
         str: 检索到的相关内容，如果没有找到则返回 "无相关信息"
     """
-    print(f"[search_knowledge_base] 开始检索，查询: {query}")
+    print(f"[Consultant Agent - search_knowledge_base] 开始检索，查询: {query}")
     
     # 简单的关键词匹配（实际可以用向量检索或更复杂的语义匹配）
     query_lower = query.lower()
@@ -134,10 +134,10 @@ def search_knowledge_base(query: str) -> str:
                 matched_keys.append(kb_key)
     
     if matched_content:
-        print(f"[search_knowledge_base] ✅ 找到 {len(matched_content)} 条匹配内容: {', '.join(matched_keys)}")
+        print(f"[Consultant Agent - search_knowledge_base] ✅ 找到 {len(matched_content)} 条匹配内容: {', '.join(matched_keys)}")
         return "\n\n".join(matched_content)
     else:
-        print(f"[search_knowledge_base] ❌ 未找到相关内容，返回'无相关信息'")
+        print(f"[Consultant Agent - search_knowledge_base] ❌ 未找到相关内容，返回'无相关信息'")
         return "无相关信息"
 
 
@@ -156,10 +156,10 @@ def tavily_search(query: str) -> str:
     from backend.config import TAVILY_API_KEY
     from tavily import TavilyClient
 
-    print(f"[tavily_search] 🌐 触发联网搜索（兜底机制），查询: {query}")
+    print(f"[Consultant Agent - tavily_search] 🌐 触发联网搜索（兜底机制），查询: {query}")
 
     if not TAVILY_API_KEY:
-        print("[tavily_search] ❌ 未配置 TAVILY_API_KEY")
+        print("[Consultant Agent - tavily_search] ❌ 未配置 TAVILY_API_KEY")
         return "搜索失败: 未配置 TAVILY_API_KEY"
 
     try:
@@ -176,14 +176,14 @@ def tavily_search(query: str) -> str:
                 search_results.append(f"- [{res['title']}]({res['url']})\n  {res['content'][:200]}...")
             
             result_text = "\n\n".join(search_results)
-            print(f"[tavily_search] ✅ 找到 {len(results)} 个联网结果")
+            print(f"[Consultant Agent - tavily_search] ✅ 找到 {len(results)} 个联网结果")
             return f"【联网搜索结果】\n{result_text}"
         else:
-            print(f"[tavily_search] ⚠️ 未找到相关信息")
+            print(f"[Consultant Agent - tavily_search] ⚠️ 未找到相关信息")
             return f"未找到关于 {query} 的相关信息"
             
     except Exception as e:
-        print(f"[tavily_search] ❌ 搜索失败: {e}")
+        print(f"[Consultant Agent - tavily_search] ❌ 搜索失败: {e}")
         return f"搜索失败: {str(e)}"
 
 

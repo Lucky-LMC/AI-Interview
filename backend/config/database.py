@@ -30,7 +30,7 @@ def init_db() -> None:
     初始化数据库（在应用启动时调用）
     """
     # 避免循环导入，在函数内部导入模型
-    from backend.models import User, InterviewRecord  # noqa: WPS433,F401
+    from backend.models import User, InterviewRecord, ConsultantRecord  # noqa: WPS433,F401
 
     Base.metadata.create_all(bind=engine)
 

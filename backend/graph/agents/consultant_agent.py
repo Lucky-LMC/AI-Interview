@@ -2,8 +2,11 @@
 """
 面试顾问 Agent - 负责回答用户关于面试的咨询
 采用"优先私有知识库 + 兜底联网搜索"的双工具策略
+支持对话记忆功能
 """
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
 from backend.graph.llm import openai_llm
 from backend.graph.tools.consultant_tools import consultant_tools
 
@@ -20,17 +23,17 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - `search_knowledge_base`：私有知识库，包含公司内部的面试指南和最佳实践
 - `tavily_search`：联网搜索，用于获取最新的行业信息
 
-**必须严格遵守以下调用流程：**
+**🚨 重要规则：你必须先调用工具，再回答问题！不要直接回答！**
 
-### Step 1: 优先调用知识库
-当用户提问时，**必须首先调用** `search_knowledge_base` 工具进行检索。
+### Step 1: 优先调用知识库（必须执行）
+当用户提问时，**无论你是否知道答案，都必须首先调用** `search_knowledge_base` 工具进行检索。
 
 ### Step 2: 评估结果
 - 如果知识库返回了相关且完整的答案（不是"无相关信息"）
   → 直接基于该内容生成回复，**不要调用** `tavily_search`
   
 - 如果知识库返回"无相关信息"或内容不够完整
-  → **立即调用** `tavily_search` 搜索最新信息
+  → **必须立即调用** `tavily_search` 搜索最新信息，**不要直接说不知道**
 
 ### Step 3: 生成回答
 - 整合工具返回的内容，给出专业的建议
@@ -43,11 +46,17 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - 使用 Markdown 格式组织答案，提高可读性
 - **直接输出答案，不要说"根据知识库..."或"根据搜索结果..."这类废话**
 
-## 🛑 核心要求
-- 每个问题都必须先调用 `search_knowledge_base`
+## 🛑 核心要求（再次强调）
+- **每个问题都必须先调用 `search_knowledge_base`，这是强制要求！**
 - 只有在知识库无结果时才调用 `tavily_search`
 - 不要编造信息，依赖工具返回的真实内容
+- 记住对话历史，提供连贯的对话体验
+- **禁止不调用工具就直接回答！**
 """
+
+# 创建全局 SQLite checkpointer（与面试工作流共享同一个数据库）
+_consultant_db_connection = sqlite3.connect("checkpoints-sqlite/checkpoints.sqlite", check_same_thread=False)
+_consultant_checkpointer = SqliteSaver(_consultant_db_connection)
 
 
 def create_consultant_agent():
@@ -55,12 +64,15 @@ def create_consultant_agent():
     创建面试顾问 Agent
     
     使用 LangGraph 的 create_react_agent 创建一个可以调用工具的 Agent
+    添加 checkpointer 支持对话记忆
+    使用 Gemini 模型（工具调用更稳定）
     返回的是一个 CompiledGraph
     """
     agent = create_react_agent(
         model=openai_llm,
         tools=consultant_tools,
-        prompt=CONSULTANT_AGENT_PROMPT
+        prompt=CONSULTANT_AGENT_PROMPT,
+        checkpointer=_consultant_checkpointer  # 添加 checkpoint 支持
     )
     return agent
 

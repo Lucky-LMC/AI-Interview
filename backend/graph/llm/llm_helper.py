@@ -1,10 +1,14 @@
-﻿# AI智能面试辅助系统V1.0，作者：刘梦畅
+# AI智能面试辅助系统V1.0，作者：刘梦畅
 """
 LLM 辅助工具
 提供统一的 LLM 实例
 """
+import json
+from typing import Any, Dict, List
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 from backend.config import (
     OPENAI_API_KEY, MODEL_NAME, TEMPERATURE, OPENAI_API_BASE,
     GEMINI_API_KEY, GEMINI_MODEL_NAME, GEMINI_API_BASE

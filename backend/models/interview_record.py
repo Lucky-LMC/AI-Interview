@@ -49,6 +49,9 @@ class InterviewRecord(Base):
     # 创建时间（使用本地时间）
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="创建时间")
     
+    # 更新时间
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False, comment="更新时间")
+    
     # 面试是否完成：True (已完成), False (进行中)
     is_finished = Column(Boolean, default=False, nullable=False, comment="面试是否完成")
     

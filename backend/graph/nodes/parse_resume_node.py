@@ -6,7 +6,7 @@
 import os
 from backend.graph.state import InterviewState
 from backend.utils.pdf_parser import parse_pdf
-from backend.graph.llm import openai_llm
+from backend.graph.llm import openai_llm  # 简历解析不需要工具调用，用 DeepSeek
 
 
 # LLM 提取简历信息的 Prompt

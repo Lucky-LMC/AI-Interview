@@ -25,7 +25,7 @@ def search_learning_resources(topic: str) -> str:
         return "搜索失败: 未配置 TAVILY_API_KEY"
 
     try:
-        print(f"[search_learning_resources] 正在搜索: {topic} 学习资源")
+        print(f"[search_learning_resources] 正在搜索: {topic}")
         tavily = TavilyClient(api_key=TAVILY_API_KEY)
         
         # 直接使用此 Topic 进行搜索

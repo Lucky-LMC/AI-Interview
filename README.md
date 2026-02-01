@@ -9,30 +9,37 @@
 - **🔄 LangGraph 工作流架构**：采用专业的 Agent 工作流设计，实现从简历解析到报告生成的完整面试逻辑
 - **📊 工作流可视化**：支持生成工作流结构图，清晰展示节点间的流转关系
 - **🤖 多 Agent 协作**：面试官 Agent、反馈 Agent、面试顾问 Agent 分工明确，各司其职
-- ** 智能面试顾问**：专门的 RAG 顾问 Agent，解答面试流程、技巧等问题，支持私有知识库 + 联网搜索兜底
+- **💬 智能面试顾问**：专门的 RAG 顾问 Agent，解答面试流程、技巧等问题，支持私有知识库 + 联网搜索兜底
 - **🔍 智能资源推荐**：基于 Tavily 搜索引擎，自动搜索并推荐真实的学习资源（书籍/课程/文档）
 - **💬 交互式面试**：支持多轮问答，基于简历项目经验提出针对性问题
 - **📝 完整面试报告**：面试结束后自动生成包含优势分析、不足改进、简历优化的完整报告
 - **🎨 极致 UI 体验**：采用 **Glassmorphism（玻璃拟态）** 设计风格，配合磨砂玻璃侧边栏和流光动态效果
 - **📄 沉浸式阅读**：简历拆解、面试题、最终报告均采用 **GitHub 风格 Markdown 文档面板**，支持代码高亮与紧凑排版
-- **💾 数据持久化**：MySQL 数据库存储面试记录，支持历史记录查询和断点续传
+- **💾 完整数据持久化**：
+  - MySQL 存储用户信息、面试记录、顾问对话记录
+  - SQLite 存储 LangGraph Checkpoint（对话状态和记忆）
+  - 支持历史记录查询、断点续传、对话记忆
+- **🔄 实时同步**：前端完全依赖后端数据，无本地缓存，多设备数据同步
 
 ## 🛠️ 技术架构
 
 ### 后端技术栈
 - **核心框架**: Python 3.9+, FastAPI
 - **AI 框架**: LangChain, LangGraph
-- **LLM**: 支持 OpenAI API 兼容接口（OpenAI、DeepSeek、Gemini 等）
+- **LLM**: 支持 OpenAI API 兼容接口（推荐使用 Qwen2.5-14B-Instruct）
 - **搜索引擎**: Tavily API（联网搜索学习资源）
-- **数据库**: SQLAlchemy + MySQL
-- **文档解析**: PyPDF2, python-docx
+- **数据库**: 
+  - MySQL 8.0+（用户数据、面试记录、顾问对话记录）
+  - SQLite（LangGraph Checkpoint，对话状态持久化）
+- **ORM**: SQLAlchemy 2.0+
+- **文档解析**: PyPDF2
 
 ### 前端技术栈
 - **核心**: 原生 HTML5, CSS3 (Variables + Flexbox/Grid), ES6+ JavaScript
 - **设计风格**: **Glassmorphism** (玻璃拟态) + **Cyberpunk** (赛博科技风微交互)
 - **文档渲染**: `marked.js` + GitHub-style CSS (优化版紧凑样式)
 - **通信**: RESTful API + `fetch`
-- **特性**: 响应式布局、动态流光效果、无阴影极简气泡、全屏沉浸体验
+- **特性**: 响应式布局、动态流光效果、无阴影极简气泡、全屏沉浸体验、实时数据同步
 
 ### 系统架构全览图
 
@@ -99,17 +106,20 @@ Interview/
 │   │   │   └── __init__.py
 │   │   └── __pycache__/
 │   ├── models/               # 数据模型
-│   │   ├── user.py          # 用户模型
-│   │   ├── interview_record.py  # 面试记录模型
-│   │   ├── schemas.py       # API 数据模型
+│   │   ├── user.py                 # 用户模型
+│   │   ├── interview_record.py     # 面试记录模型
+│   │   ├── consultant_record.py    # 顾问对话记录模型
+│   │   ├── schemas.py              # API 数据模型
 │   │   └── __init__.py
 │   ├── routes/              # API 路由
-│   │   ├── interview_routes.py  # 面试相关接口
-│   │   ├── auth_routes.py      # 用户认证接口
+│   │   ├── interview_routes.py    # 面试相关接口
+│   │   ├── consultant_routes.py   # 顾问相关接口
+│   │   ├── auth_routes.py        # 用户认证接口
 │   │   └── __init__.py
 │   ├── utils/               # 工具函数
-│   │   ├── pdf_parser.py   # PDF 解析工具
-│   │   ├── workflow_visualizer.py # 工作流可视化工具
+│   │   ├── pdf_parser.py              # PDF 解析工具
+│   │   ├── workflow_visualizer.py     # 工作流可视化工具
+│   │   ├── sync_checkpoints_with_mysql.py  # Checkpoint 同步工具
 │   │   └── __init__.py
 │   ├── main.py              # 应用入口
 ├── frontend/                # 前端代码
@@ -184,13 +194,18 @@ FLUSH PRIVILEGES;
 
 ```env
 # ========== LLM 配置 ==========
-# OpenAI API 配置（或兼容接口，如 DeepSeek）
+# 推荐使用硅基流动 + Qwen2.5-14B-Instruct（速度快、效果好、免费）
 OPENAI_API_KEY=your_api_key_here
-OPENAI_API_BASE=https://api.openai.com/v1
-MODEL_NAME=gpt-4
+OPENAI_API_BASE=https://api.siliconflow.cn/v1
+MODEL_NAME=Qwen/Qwen2.5-14B-Instruct
 
 # 温度参数（控制输出随机性，0.0-1.0）
 TEMPERATURE=0.7
+
+# ========== Gemini 配置（可选，备用模型）==========
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_API_BASE=https://generativelanguage.googleapis.com
+GEMINI_MODEL_NAME=gemini-1.5-flash
 
 # ========== 搜索工具配置 ==========
 # Tavily API 密钥（用于搜索学习资源）
@@ -200,15 +215,10 @@ TAVILY_API_KEY=tvly-xxxxxxxxx
 # ========== 数据库配置 ==========
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=interview_user
+DB_USER=root
 DB_PASSWORD=your_password
-DB_NAME=interview_db
-DATABASE_URL=mysql+pymysql://interview_user:your_password@localhost:3306/interview_db
-
-# ========== Gemini 配置（可选）==========
-GEMINI_API_KEY=
-GEMINI_API_BASE=
-GEMINI_MODEL_NAME=
+DB_NAME=Interview
+DATABASE_URL=mysql+pymysql://root:your_password@localhost:3306/Interview?charset=utf8mb4
 
 # ========== LangSmith 配置（可选，用于调试）==========
 LANGSMITH_API_KEY=
@@ -244,7 +254,7 @@ python backend/utils/workflow_visualizer.py
 
 ### 2. 开始面试
 - 登录后进入主页面
-- 点击"上传简历"按钮，选择 PDF 或 Word 格式的简历
+- 点击"上传简历"按钮，选择 PDF 格式的简历
 - 设置面试轮数（默认 3 轮）
 - 点击"开始面试"
 
@@ -258,16 +268,101 @@ python backend/utils/workflow_visualizer.py
 ### 4. 查看报告
 - 面试结束后，系统会自动生成详细的面试报告
 - 报告包含：
-- 📊 整体表现总结
-- ✅ 优势分析
-- ⚠️ 不足与改进建议（附带学习资源链接）
-- 📝 简历优化建议
-- 🎯 录用建议
+  - 📊 整体表现总结
+  - ✅ 优势分析
+  - ⚠️ 不足与改进建议（附带学习资源链接）
+  - 📝 简历优化建议
+  - 🎯 录用建议
 
-### 5. 历史记录
-- 点击左侧边栏的历史记录
-- 查看之前的面试记录
+### 5. 智能面试顾问
+- 点击左侧"智能面试顾问"按钮进入顾问页面
+- 可以随时咨询面试相关问题：
+  - 面试流程和技巧
+  - 简历优化建议
+  - 自我介绍准备
+  - STAR 法则应用
+  - 行业面试题目
+- 顾问会优先检索知识库，如无结果则自动联网搜索
+- 支持多轮对话，具有记忆功能
+
+### 6. 历史记录
+- 左侧边栏显示所有历史记录
+- 按时间分组：今天、昨天、前天、7天内、30天内、更早
 - 点击记录可查看详细内容
+- 支持删除记录（同时删除数据库和 Checkpoint）
+
+## 💡 数据存储说明
+
+### 双数据库架构
+
+本系统采用 **MySQL + SQLite** 双数据库架构：
+
+#### 1. MySQL（主数据库）
+存储业务数据，支持多用户、跨设备访问：
+
+**users 表**：用户信息
+- user_name（主键）
+- password_hash
+- created_at
+
+**interview_records 表**：面试记录
+- thread_id（主键）
+- user_name（外键）
+- resume_text（简历内容）
+- resume_file_path（PDF 文件路径）
+- resume_file_name（原始文件名）
+- history（面试问答历史，JSON）
+- report（最终报告）
+- is_finished（是否完成）
+- created_at / updated_at
+
+**consultant_records 表**：顾问对话记录
+- thread_id（主键）
+- user_name（外键）
+- title（会话标题，自动从第一条消息提取）
+- messages（对话历史，JSON）
+- created_at / updated_at
+
+#### 2. SQLite（Checkpoint 数据库）
+存储 LangGraph 的对话状态和记忆，位于 `checkpoints-sqlite/checkpoints.sqlite`：
+
+**checkpoints 表**：Agent 执行的每个状态快照
+- thread_id（会话ID）
+- checkpoint_id（快照ID）
+- checkpoint_ns（命名空间）
+- parent_checkpoint_id（父快照ID）
+- checkpoint（状态数据，二进制）
+
+**writes 表**：Agent 的写入操作记录
+- thread_id
+- checkpoint_id
+- task_id
+- channel
+- value（写入的数据）
+
+#### 数据同步机制
+
+- **创建记录**：同时写入 MySQL 和 SQLite
+- **更新记录**：MySQL 更新业务数据，SQLite 追加新的 checkpoint
+- **删除记录**：同时删除 MySQL 记录和 SQLite checkpoint
+- **查询记录**：从 MySQL 读取，SQLite 用于恢复对话状态
+
+#### Checkpoint 管理
+
+随着使用，SQLite 中的 checkpoint 会越来越多（每次 Agent 执行都会产生多个快照）。提供了管理工具：
+
+```bash
+# 查看 checkpoint 数据并同步清理
+python -m backend.utils.sync_checkpoints_with_mysql
+```
+
+该工具会：
+1. 对比 MySQL 和 SQLite 中的 thread_id
+2. 找出"孤儿" checkpoint（在 SQLite 但不在 MySQL）
+3. 询问是否删除
+4. 显示最终的数据状态
+
+**建议**：定期运行此工具，保持数据一致性。
 
 ## 🎯 核心功能
 
@@ -352,25 +447,37 @@ python backend/utils/workflow_visualizer.py
 4. 在 Agent 创建时传入工具列表
 
 ### API 接口说明
+
+#### 面试相关接口
 - `POST /api/interview/start`：开始面试（上传简历）
 - `POST /api/interview/submit`：提交回答
 - `GET /api/interview/resume/{thread_id}`：获取简历 PDF
 - `GET /api/interview/records`：获取面试记录列表
 - `GET /api/interview/records/{thread_id}`：获取面试记录详情
+- `DELETE /api/interview/records/{thread_id}`：删除面试记录
+
+#### 顾问相关接口
+- `POST /api/customer-service/chat`：与顾问对话
+- `GET /api/customer-service/records`：获取顾问对话记录列表
+- `GET /api/customer-service/records/{thread_id}`：获取对话记录详情
+- `DELETE /api/customer-service/records/{thread_id}`：删除对话记录
+
+#### 用户认证接口
 - `POST /api/auth/register`：用户注册
 - `POST /api/auth/login`：用户登录
 
 ## 🔍 常见问题
 
 ### 1. 如何获取 Tavily API Key？
-访问 [Tavily 官网](https://tavily.com/) 注册账号，在控制台获取 API Key。
+访问 [Tavily 官网](https://tavily.com/) 注册账号，在控制台获取 API Key。免费版每月有一定额度。
 
 ### 2. 支持哪些 LLM？
-支持所有兼容 OpenAI API 的模型，包括：
-- OpenAI（GPT-4, GPT-3.5）
-- DeepSeek
-- 通义千问
-- 其他兼容接口
+支持所有兼容 OpenAI API 的模型，推荐使用：
+- **Qwen2.5-14B-Instruct**（推荐）：速度快、效果好、免费
+- **Qwen2.5-7B-Instruct**：更快，适合资源受限环境
+- **DeepSeek-V3**：性能强大但速度较慢
+- **Gemini 1.5 Flash**：Google 提供，免费额度充足
+- **GPT-4/GPT-3.5**：OpenAI 官方模型
 
 ### 3. 如何修改面试轮数？
 在前端上传简历时可以设置，或在 `backend/routes/interview_routes.py` 中修改默认值。
@@ -378,11 +485,26 @@ python backend/utils/workflow_visualizer.py
 ### 4. 数据库连接失败怎么办？
 检查 `.env` 文件中的数据库配置是否正确，确保 MySQL 服务已启动。
 
-### 5. 如何部署到生产环境？
+### 5. Checkpoint 数据太多怎么办？
+运行清理工具：
+```bash
+python -m backend.utils.sync_checkpoints_with_mysql
+```
+该工具会删除 MySQL 中不存在的"孤儿" checkpoint，保持数据一致性。
+
+### 6. 如何切换 LLM 模型？
+修改 `.env` 文件中的 `MODEL_NAME` 和 `OPENAI_API_BASE`，然后重启后端服务。
+
+### 7. 顾问 Agent 不调用工具怎么办？
+确保使用的模型支持工具调用（Function Calling）。推荐使用 Qwen2.5 系列或 Gemini 系列。
+
+### 8. 如何部署到生产环境？
 - 使用 Gunicorn 或 uWSGI 作为 WSGI 服务器
 - 使用 Nginx 作为反向代理
 - 配置 HTTPS 证书
 - 修改 CORS 配置，限制允许的域名
+- 定期备份 MySQL 数据库
+- 定期清理 SQLite checkpoint
 
 ## 🤝 贡献指南
 

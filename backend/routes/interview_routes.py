@@ -67,6 +67,7 @@ async def start_interview(
          raise HTTPException(status_code=401, detail="需要登录")
 
     pdf_file_path = None
+    db_record_created = False
     try:
         # 1. 生成会话 ID
         thread_id = str(uuid.uuid4())
@@ -77,6 +78,8 @@ async def start_interview(
         
         with open(pdf_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        
+        print(f"[start_interview] PDF 已保存: {pdf_file_path}")
         
         # 3. 初始化状态
         initial_state: InterviewState = {
@@ -100,24 +103,21 @@ async def start_interview(
         question = history[-1].get('question', '') if history else ''
         resume_text = result.get('resume_text', '')
         
-        # 6. 【新增】立即创建数据库记录
-        try:
-            new_record = InterviewRecord(
-                thread_id=thread_id,
-                user_name=user_name,
-                resume_text=resume_text,
-                resume_file_path=str(pdf_file_path),  # 保存文件路径
-                resume_file_name=file.filename,  # 保存原始文件名
-                history=history,
-                report="",
-                is_finished=False
-            )
-            db.add(new_record)
-            db.commit()
-        except Exception as db_e:
-            db.rollback()
-            print(f"创建初始面试记录失败: {db_e}")
-            # 不阻断流程，但记录错误
+        # 6. 创建数据库记录
+        new_record = InterviewRecord(
+            thread_id=thread_id,
+            user_name=user_name,
+            resume_text=resume_text,
+            resume_file_path=str(pdf_file_path),
+            resume_file_name=file.filename,
+            history=history,
+            report="",
+            is_finished=False
+        )
+        db.add(new_record)
+        db.commit()
+        db_record_created = True
+        print(f"[start_interview] 数据库记录已创建: thread_id={thread_id}")
 
         # 构建PDF文件的访问URL
         resume_file_url = f"/api/interview/resume/{thread_id}"
@@ -132,14 +132,41 @@ async def start_interview(
         )
     
     except Exception as e:
-        if pdf_file_path and pdf_file_path.exists():
-            try:
-                pdf_file_path.unlink()
-            except:
-                pass
+        # 回滚所有操作
         import traceback
         print(f"[start_interview] 发生异常: {e}")
         print(traceback.format_exc())
+        
+        # 1. 删除 PDF 文件
+        if pdf_file_path and pdf_file_path.exists():
+            try:
+                pdf_file_path.unlink()
+                print(f"[start_interview] 已删除 PDF 文件: {pdf_file_path}")
+            except Exception as del_e:
+                print(f"[start_interview] 删除 PDF 文件失败: {del_e}")
+        
+        # 2. 删除 LangGraph 会话记录
+        if 'thread_id' in locals():
+            try:
+                if CHECKPOINT_DB.exists():
+                    conn = sqlite3.connect(str(CHECKPOINT_DB))
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+                    cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+                    conn.commit()
+                    conn.close()
+                    print(f"[start_interview] 已删除会话记录: thread_id={thread_id}")
+            except Exception as cp_e:
+                print(f"[start_interview] 删除会话记录失败: {cp_e}")
+        
+        # 3. 删除数据库记录（如果已创建）
+        if db_record_created:
+            try:
+                db.rollback()
+                print(f"[start_interview] 已回滚数据库事务")
+            except Exception as db_e:
+                print(f"[start_interview] 回滚数据库失败: {db_e}")
+        
         raise HTTPException(status_code=500, detail=f"开始面试失败: {str(e)}")
 
 
@@ -211,6 +238,10 @@ async def submit_answer(
                 if is_finished:
                     record.report = report
                 
+                # 手动更新时间戳
+                from datetime import datetime
+                record.updated_at = datetime.now()
+                
                 # 即使没结束也保存 history
                 db.commit()
             else:
@@ -251,6 +282,8 @@ async def submit_answer(
                 try:
                      if record:
                         record.history = continue_history
+                        from datetime import datetime
+                        record.updated_at = datetime.now()
                         db.commit()
                 except:
                     pass
@@ -278,17 +311,18 @@ async def get_interview_records(
         raise HTTPException(status_code=401, detail="需要登录")
     
     try:
-        # 查询该用户的所有面试记录，按创建时间倒序
+        # 查询该用户的所有面试记录，按更新时间倒序
         records = db.query(InterviewRecord).filter(
             InterviewRecord.user_name == user_name
-        ).order_by(InterviewRecord.created_at.desc()).all()
+        ).order_by(InterviewRecord.updated_at.desc()).all()
         
         # 转换为响应格式
         record_items = []
         for record in records:
             record_items.append({
                 "thread_id": record.thread_id,
-                "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "updated_at": record.updated_at.strftime("%Y-%m-%d %H:%M:%S")
             })
         
         return InterviewRecordListResponse(records=record_items)
@@ -334,7 +368,8 @@ async def get_interview_record_detail(
             history=record.history if record.history else [],
             report=record.report,
             is_finished=record.is_finished,
-            created_at=record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            created_at=record.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            updated_at=record.updated_at.strftime("%Y-%m-%d %H:%M:%S")
         )
     
     except HTTPException:

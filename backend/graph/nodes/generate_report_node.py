@@ -4,7 +4,7 @@
 整合所有信息生成完整的面试报告
 """
 from backend.graph.state import InterviewState
-from backend.graph.llm import openai_llm
+from backend.graph.llm import openai_llm  # 报告生成不需要工具调用，用 DeepSeek
 
 
 def generate_report_node(state: InterviewState) -> InterviewState:

@@ -1,4 +1,4 @@
-﻿# AI智能面试辅助系统V1.0，作者刘梦畅
+# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 工作流图层 - LangGraph 工作流编排
 用于定义面试系统的整体流程和节点间的流转逻辑
@@ -12,7 +12,7 @@ from backend.graph.nodes import (
     ask_question_node,       # 出题节点
     answer_node,             # 回答节点（中断点）
     check_finish_node,       # 检查是否结束节点
-    feedback_node,           # 搜索学习资源节点（Feedback Agent）
+    feedback_node,           # 反馈节点（Feedback Agent）
     generate_report_node     # 生成报告节点
 )
 

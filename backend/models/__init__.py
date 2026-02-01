@@ -4,6 +4,7 @@
 """
 from .user import User
 from .interview_record import InterviewRecord
+from .consultant_record import ConsultantRecord
 from .schemas import (
     SubmitAnswerRequest,
     StartInterviewResponse,
@@ -16,6 +17,7 @@ from .schemas import (
 __all__ = [
     "User",
     "InterviewRecord",
+    "ConsultantRecord",
     "SubmitAnswerRequest",
     "StartInterviewResponse",
     "InterviewStatusResponse",

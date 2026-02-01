@@ -4,7 +4,7 @@
 包含联网搜索和简历出题两个工具
 """
 from langchain_core.tools import tool
-from backend.graph.llm import openai_llm
+from backend.graph.llm import openai_llm  # 工具内部的文本处理用 DeepSeek
 
 
 @tool

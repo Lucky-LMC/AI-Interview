@@ -84,6 +84,7 @@ class InterviewRecordDetailResponse(BaseModel):
     report: Optional[str] = Field(None, description="最终报告")
     is_finished: bool = Field(..., description="面试是否完成")
     created_at: str = Field(..., description="创建时间")
+    updated_at: Optional[str] = Field(None, description="更新时间")
 
 
 # ========== 4. 智能顾问模型 (Consultant) ==========
@@ -93,11 +94,27 @@ class InterviewRecordDetailResponse(BaseModel):
 class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str = Field(..., description="用户消息")
-    user_name: str = Field("User", description="用户名")
+    thread_id: Optional[str] = Field(None, description="会话ID（用于保持对话上下文）")
 
 # --- Responses ---
 
 class ChatResponse(BaseModel):
     """聊天响应模型"""
     reply: str = Field(..., description="Agent 回复")
+    thread_id: str = Field(..., description="会话ID")
     success: bool = Field(True, description="是否成功")
+
+
+class ConsultantRecordListResponse(BaseModel):
+    """顾问对话记录列表响应"""
+    records: List[Dict[str, str]] = Field(..., description="对话记录列表，每个记录包含 thread_id 和 created_at")
+
+
+class ConsultantRecordDetailResponse(BaseModel):
+    """顾问对话记录详情响应"""
+    thread_id: str = Field(..., description="会话ID")
+    user_name: str = Field(..., description="用户名")
+    title: str = Field(..., description="会话标题")
+    messages: List[Dict[str, str]] = Field(..., description="对话历史")
+    created_at: str = Field(..., description="创建时间")
+    updated_at: str = Field(..., description="更新时间")

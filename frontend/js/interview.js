@@ -485,6 +485,13 @@ async function handleSubmitAnswer(answer) {
 
             addMessage('ai', `# 🎉 面试最终报告\n\n${result.report || '暂无报告'}`, false, false, true);
 
+            // 更新右侧面试看板
+            updateDashboard({
+                ...interviewState,
+                is_finished: true,
+                round: result.round
+            });
+
             // 重新加载记录列表（面试完成后会新增一条记录）
             renderInterviewRecords();
         } else {
@@ -497,6 +504,13 @@ async function handleSubmitAnswer(answer) {
             // hideLoading();
 
             addMessage('ai', `# 📊 第 ${result.round} 轮面试\n\n### ❓ 问题：\n\n${result.question || ''}`, false, false, true);
+
+            // 更新右侧面试看板
+            updateDashboard({
+                ...interviewState,
+                is_finished: false,
+                round: result.round
+            });
         }
     } catch (error) {
         // hideLoading();
@@ -528,51 +542,57 @@ async function renderInterviewRecords() {
 
         // 如果有记录，按日期分组
         if (records.length > 0) {
-            // 今天和最近的分组
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const todayRecords = [];
-            const recentRecords = [];
+            // 按时间分组：今天、昨天、前天、7天内、30天内、更早
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            
+            const groups = {
+                '今天': [],
+                '昨天': [],
+                '前天': [],
+                '7天内': [],
+                '30天内': [],
+                '更早': []
+            };
 
             records.forEach(record => {
-                const recordDate = new Date(record.created_at);
-                recordDate.setHours(0, 0, 0, 0);
-
-                if (recordDate.getTime() === today.getTime()) {
-                    todayRecords.push(record);
+                const recordDate = new Date(record.updated_at || record.created_at);
+                const recordDay = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate());
+                
+                const daysDiff = Math.floor((today - recordDay) / (1000 * 60 * 60 * 24));
+                
+                if (daysDiff === 0) {
+                    groups['今天'].push(record);
+                } else if (daysDiff === 1) {
+                    groups['昨天'].push(record);
+                } else if (daysDiff === 2) {
+                    groups['前天'].push(record);
+                } else if (daysDiff <= 7) {
+                    groups['7天内'].push(record);
+                } else if (daysDiff <= 30) {
+                    groups['30天内'].push(record);
                 } else {
-                    recentRecords.push(record);
+                    groups['更早'].push(record);
                 }
             });
 
-            // 渲染今天的记录
-            if (todayRecords.length > 0) {
-                const todaySection = document.createElement('div');
-                todaySection.className = 'history-section';
-                todaySection.innerHTML = '<div class="history-title">今天</div>';
+            // 按顺序渲染各个分组
+            const groupOrder = ['今天', '昨天', '前天', '7天内', '30天内', '更早'];
+            groupOrder.forEach(groupName => {
+                const groupRecords = groups[groupName];
+                if (groupRecords.length > 0) {
+                    const section = document.createElement('div');
+                    section.className = 'history-section';
+                    section.innerHTML = `<div class="history-title">${groupName}</div>`;
 
-                todayRecords.forEach(record => {
-                    const item = createRecordItem(record);
-                    todaySection.appendChild(item);
-                });
+                    groupRecords.forEach(record => {
+                        const item = createRecordItem(record);
+                        section.appendChild(item);
+                    });
 
-                chatHistory.appendChild(todaySection);
-            }
-
-            // 渲染最近的记录
-            if (recentRecords.length > 0) {
-                const recentSection = document.createElement('div');
-                recentSection.className = 'history-section';
-                recentSection.innerHTML = '<div class="history-title">最近</div>';
-
-                recentRecords.forEach(record => {
-                    const item = createRecordItem(record);
-                    recentSection.appendChild(item);
-                });
-
-                chatHistory.appendChild(recentSection);
-            }
+                    chatHistory.appendChild(section);
+                }
+            });
         } else {
             // 没有记录时显示提示
             const emptySection = document.createElement('div');
@@ -690,8 +710,11 @@ function createRecordItem(record) {
 
     // 显示"面试记录"加上会话ID（截取前8位）和创建时间（日期+时分）
     const threadIdShort = record.thread_id.substring(0, 8);
+    // 优先显示更新时间，如果没有则显示创建时间
+    const timeToDisplay = record.updated_at || record.created_at;
+
     // 后端返回的是本地时间，格式：2025-11-30 13:59:42，直接提取日期和时分
-    const dateTimeParts = record.created_at.split(' ');
+    const dateTimeParts = timeToDisplay.split(' ');
     const dateStr = dateTimeParts[0]; // 日期部分
     const timeStr = dateTimeParts[1] ? dateTimeParts[1].substring(0, 5) : ''; // 时分部分（前5个字符）
     const dateTimeStr = timeStr ? `${dateStr} ${timeStr}` : dateStr;

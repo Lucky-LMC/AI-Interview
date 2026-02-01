@@ -9,15 +9,14 @@ const newChatBtn = document.getElementById('new-agent-chat-btn');
 const historyContainer = document.getElementById('agent-chat-history');
 const loadingOverlay = document.getElementById('loading-overlay');
 
-// 本地存储 key
-const STORAGE_KEY = 'agent_chat_sessions';
+// 当前会话ID
 let currentSessionId = null;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupEventListeners();
-    createNewSession(false); //如果不强制新建，则加载最近一次会话
+    loadMostRecentSession(); // 改为加载最近的会话，如果没有则显示空白
     checkInputEmpty(); // 初始化按钮状态
 });
 
@@ -71,118 +70,240 @@ function checkInputEmpty() {
     }
 }
 
-// 获取所有会话
-function getSessions() {
-    const json = localStorage.getItem(STORAGE_KEY);
-    return json ? JSON.parse(json) : [];
+// 加载最近的会话（如果有）
+async function loadMostRecentSession() {
+    // 不自动加载历史会话，始终显示新对话
+    // 用户可以通过点击左侧历史记录来加载
+    
+    // 渲染历史记录列表
+    await renderHistoryList();
+    
+    // 显示欢迎消息（不保存到后端）
+    showWelcomeMessage();
 }
 
-// 保存所有会话
-function saveSessions(sessions) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+// 显示欢迎消息（不保存到后端）
+function showWelcomeMessage() {
+    messagesContainer.innerHTML = '';
+    addMessageToUI('ai', '你好！我是您的专业面试顾问。我可以帮您解答面试流程、分享 STAR 法则技巧，或者为您搜寻最新的行业面试题。请问有什么可以帮您？', false);
 }
 
 // 创建新会话
 function createNewSession(forceNew = true) {
-    let sessions = getSessions();
-
-    // 如果不强制新建，且最近有一个空会话或刚开始的会话，就复用它
-    if (!forceNew && sessions.length > 0) {
-        loadSession(sessions[0].id);
-        return;
-    }
-
-    const newSession = {
-        id: Date.now().toString(),
-        title: '新咨询会话',
-        timestamp: new Date().toISOString(),
-        messages: [{
-            type: 'ai',
-            content: '你好！我是您的专业面试顾问。我可以帮您解答面试流程、分享 STAR 法则技巧，或者为您搜寻最新的行业面试题。请问有什么可以帮您？'
-        }]
-    };
-
-    sessions.unshift(newSession); // 加到最前
-    saveSessions(sessions);
-    loadSession(newSession.id);
+    // 清空当前会话
+    currentSessionId = null;
+    messagesContainer.innerHTML = '';
+    
+    // 显示欢迎消息（不保存）
+    showWelcomeMessage();
+    
+    // 刷新历史列表
+    renderHistoryList();
 }
 
-// 加载会话
+// 加载会话（已废弃，保留空函数以防报错）
 function loadSession(sessionId) {
-    currentSessionId = sessionId;
-    const sessions = getSessions();
-    const session = sessions.find(s => s.id === sessionId);
-
-    if (!session) return;
-
-    // 清空界面
-    messagesContainer.innerHTML = '';
-
-    // 渲染消息
-    session.messages.forEach(msg => {
-        addMessageToUI(msg.type, msg.content, false); // false = 不保存，因为已经保存过了
-    });
-
-    // 更新侧边栏高亮
-    renderHistoryList();
-    scrollToBottom();
+    console.warn('loadSession is deprecated');
 }
 
 // 渲染历史列表
-function renderHistoryList() {
-    const sessions = getSessions();
+async function renderHistoryList() {
+    // 防止重复请求
+    if (renderHistoryList.isLoading) return;
+    renderHistoryList.isLoading = true;
+    
     historyContainer.innerHTML = '';
 
-    if (sessions.length === 0) return;
-
-    const section = document.createElement('div');
-    section.className = 'history-section';
-    section.innerHTML = '<div class="history-title">最近咨询</div>';
-
-    sessions.forEach(session => {
-        const item = document.createElement('div');
-        item.className = `chat-item ${session.id === currentSessionId ? 'active' : ''}`;
-
-        // 格式化时间
-        const date = new Date(session.timestamp);
-        const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
-
-        item.innerHTML = `
-            <div>
-                <span class="chat-title">${session.title}</span>
-                <button class="chat-menu-btn" title="删除" onclick="deleteSession(event, '${session.id}')">×</button>
-            </div>
-            <span class="chat-meta">${timeStr}</span>
-        `;
-
-        item.addEventListener('click', (e) => {
-            // 防止点击删除按钮时触发
-            if (!e.target.classList.contains('chat-menu-btn')) {
-                loadSession(session.id);
+    try {
+        // 从后端获取记录
+        const auth = getAuth();
+        const response = await fetch(`${API_BASE_URL.replace('/api/interview', '/api/customer-service')}/records`, {
+            headers: {
+                'X-User-Name': auth ? auth.userName : ''
             }
         });
 
-        section.appendChild(item);
-    });
+        if (!response.ok) {
+            console.warn('获取顾问记录失败');
+            return;
+        }
 
-    historyContainer.appendChild(section);
+        const data = await response.json();
+        const records = data.records || [];
+
+        if (records.length === 0) return;
+
+        // 按时间分组：今天、昨天、前天、7天内、30天内、更早
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const groups = {
+            '今天': [],
+            '昨天': [],
+            '前天': [],
+            '7天内': [],
+            '30天内': [],
+            '更早': []
+        };
+
+        records.forEach(record => {
+            const recordDate = new Date(record.updated_at || record.created_at);
+            const recordDay = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate());
+            
+            const daysDiff = Math.floor((today - recordDay) / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff === 0) {
+                groups['今天'].push(record);
+            } else if (daysDiff === 1) {
+                groups['昨天'].push(record);
+            } else if (daysDiff === 2) {
+                groups['前天'].push(record);
+            } else if (daysDiff <= 7) {
+                groups['7天内'].push(record);
+            } else if (daysDiff <= 30) {
+                groups['30天内'].push(record);
+            } else {
+                groups['更早'].push(record);
+            }
+        });
+
+        // 按顺序渲染各个分组
+        const groupOrder = ['今天', '昨天', '前天', '7天内', '30天内', '更早'];
+        groupOrder.forEach(groupName => {
+            const groupRecords = groups[groupName];
+            if (groupRecords.length > 0) {
+                const section = document.createElement('div');
+                section.className = 'history-section';
+                section.innerHTML = `<div class="history-title">${groupName}</div>`;
+
+                groupRecords.forEach(record => {
+                    const item = createRecordItem(record);
+                    section.appendChild(item);
+                });
+
+                historyContainer.appendChild(section);
+            }
+        });
+
+    } catch (error) {
+        console.error('获取顾问记录失败:', error);
+    } finally {
+        renderHistoryList.isLoading = false;
+    }
 }
 
-// 删除会话
-window.deleteSession = function (event, sessionId) {
-    event.stopPropagation();
-    if (!confirm('确定删除这条记录吗？')) return;
+// 创建记录项
+function createRecordItem(record) {
+    const item = document.createElement('div');
+    item.className = `chat-item ${record.thread_id === currentSessionId ? 'active' : ''}`;
 
-    let sessions = getSessions();
-    sessions = sessions.filter(s => s.id !== sessionId);
-    saveSessions(sessions);
+    // 使用后端返回的标题
+    const title = record.title || '新咨询会话';
 
-    if (currentSessionId === sessionId) {
-        createNewSession(true); // 如果删除了当前会话，新建一个
-    } else {
-        renderHistoryList(); // 仅刷新列表
+    // 格式化时间
+    const timeStr = record.updated_at || record.created_at;
+    const date = new Date(timeStr);
+    const displayTime = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+    item.innerHTML = `
+        <div>
+            <span class="chat-title">${title}</span>
+            <button class="chat-menu-btn chat-delete-btn" title="删除">×</button>
+        </div>
+        <span class="chat-meta">${displayTime}</span>
+    `;
+
+    // 点击加载会话
+    item.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('chat-menu-btn')) {
+            loadSessionFromBackend(record.thread_id);
+        }
+    });
+
+    // 删除按钮
+    const deleteBtn = item.querySelector('.chat-delete-btn');
+    deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await handleDeleteSessionFromBackend(record.thread_id);
+    });
+
+    return item;
+}
+
+// 从后端加载会话
+async function loadSessionFromBackend(threadId) {
+    try {
+        showLoading();
+        const auth = getAuth();
+        const response = await fetch(`${API_BASE_URL.replace('/api/interview', '/api/customer-service')}/records/${threadId}`, {
+            headers: {
+                'X-User-Name': auth ? auth.userName : ''
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('加载会话失败');
+        }
+
+        const data = await response.json();
+        currentSessionId = threadId;
+
+        // 清空界面
+        messagesContainer.innerHTML = '';
+
+        // 渲染消息
+        if (data.messages && data.messages.length > 0) {
+            data.messages.forEach(msg => {
+                const type = msg.role === 'human' ? 'user' : 'ai';
+                addMessageToUI(type, msg.content, false);
+            });
+        }
+
+        hideLoading();
+        renderHistoryList();
+        scrollToBottom();
+
+    } catch (error) {
+        hideLoading();
+        console.error('加载会话失败:', error);
+        alert('加载会话失败');
     }
-};
+}
+
+// 从后端删除会话
+async function handleDeleteSessionFromBackend(threadId) {
+    if (!confirm('确定要删除这条记录吗？删除后无法恢复！')) return;
+
+    try {
+        showLoading();
+        const auth = getAuth();
+        const response = await fetch(`${API_BASE_URL.replace('/api/interview', '/api/customer-service')}/records/${threadId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Name': auth ? auth.userName : ''
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('删除失败');
+        }
+
+        hideLoading();
+
+        // 如果删除了当前会话，新建一个
+        if (currentSessionId === threadId) {
+            createNewSession(true);
+        } else {
+            renderHistoryList();
+        }
+
+    } catch (error) {
+        hideLoading();
+        console.error('删除失败:', error);
+        alert(`删除失败：${error.message}`);
+    }
+}
 
 // 发送消息处理
 async function handleSendMessage() {
@@ -195,19 +316,20 @@ async function handleSendMessage() {
     userInput.style.height = 'auto';
     checkInputEmpty();
 
-    // 2. 更新会话标题（如果是第一条用户消息）
-    updateSessionTitleIfNeeded(message);
-
-    // 3. 显示加载
+    // 2. 显示加载
     showLoading();
 
     try {
         const auth = getAuth();
         const response = await fetch(`${API_BASE_URL.replace('/api/interview', '/api/customer-service')}/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Name': auth ? auth.userName : ''
+            },
             body: JSON.stringify({
                 message: message,
+                thread_id: currentSessionId, // 使用当前会话ID（如果是新会话则为null）
                 user_name: auth ? auth.userName : 'User'
             })
         });
@@ -216,7 +338,15 @@ async function handleSendMessage() {
         hideLoading();
 
         if (data.success) {
+            // 保存后端返回的 thread_id
+            if (data.thread_id) {
+                currentSessionId = data.thread_id;
+            }
+
             addMessageToUI('ai', data.reply, true);
+            
+            // 刷新左侧历史记录列表
+            renderHistoryList();
         } else {
             addMessageToUI('ai', '抱歉，服务暂时不可用。', true);
         }
@@ -228,19 +358,7 @@ async function handleSendMessage() {
     }
 }
 
-// 更新标题
-function updateSessionTitleIfNeeded(firstUserMessage) {
-    const sessions = getSessions();
-    const session = sessions.find(s => s.id === currentSessionId);
-    if (session && session.title === '新咨询会话') {
-        // 截取前 15 个字符作为标题
-        session.title = firstUserMessage.substring(0, 15) + (firstUserMessage.length > 15 ? '...' : '');
-        saveSessions(sessions);
-        renderHistoryList();
-    }
-}
-
-// 添加消息到 UI 并保存
+// 添加消息到 UI（不再保存到本地存储）
 function addMessageToUI(type, content, shouldSave = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
@@ -255,7 +373,6 @@ function addMessageToUI(type, content, shouldSave = false) {
         avatar.textContent = getAuth()?.userName?.charAt(0).toUpperCase() || 'U';
     }
 
-    // 内容气泡
     // 内容气泡
     const messageContent = document.createElement('div');
     // 如果是 AI 消息且包含 Markdown，添加 markdown-document 类以启用 GitHub 风格样式
@@ -288,28 +405,8 @@ function addMessageToUI(type, content, shouldSave = false) {
     messagesContainer.appendChild(messageDiv);
 
     scrollToBottom();
-
-    if (shouldSave) {
-        saveMessageToStorage(type, content);
-    }
-}
-
-// 保存消息到 Storage
-function saveMessageToStorage(type, content) {
-    const sessions = getSessions();
-    const session = sessions.find(s => s.id === currentSessionId);
-    if (session) {
-        session.messages.push({ type, content });
-        // 更新时间戳
-        session.timestamp = new Date().toISOString();
-        // 移到最前（最近更新）
-        const index = sessions.indexOf(session);
-        sessions.splice(index, 1);
-        sessions.unshift(session);
-
-        saveSessions(sessions);
-        renderHistoryList();
-    }
+    
+    // shouldSave 参数已废弃，不再保存到本地存储
 }
 
 function showLoading() { loadingOverlay.classList.remove('hidden'); }
