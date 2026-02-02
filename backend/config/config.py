@@ -33,6 +33,9 @@ MODEL_NAME = get_required_env("MODEL_NAME")
 # 温度参数：控制输出的随机性（0.0-1.0）
 TEMPERATURE = float(get_required_env("TEMPERATURE"))
 
+# Embedding 模型名称
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
+
 # ========== LangSmith 配置 ==========
 # LangSmith API 密钥（用于追踪和调试）
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
@@ -40,16 +43,6 @@ LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
 # ========== Tavily 配置 ==========
 # Tavily API 密钥
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
-
-# ========== Gemini 配置 ==========
-# Gemini API 密钥
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-
-# Gemini API 基础 URL
-GEMINI_API_BASE = os.getenv("GEMINI_API_BASE", "")
-
-# Gemini 模型名称
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "")
 
 # ========== 数据库配置 ==========
 DB_HOST = get_required_env("DB_HOST")

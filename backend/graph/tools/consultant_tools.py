@@ -1,190 +1,149 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """
-私有知识库工具 - 用于检索面试相关内部文档
+面试顾问工具 - RAG 版本
+使用 Chroma 向量数据库进行语义检索
 """
 from langchain_core.tools import tool
-from typing import Optional
+from langchain_chroma import Chroma
+from pathlib import Path
+from backend.graph.llm import openai_embeddings
+from backend.config import TAVILY_API_KEY
 
-# 模拟的私有知识库（实际项目中可以接入向量数据库如Chroma、Pinecone等）
-KNOWLEDGE_BASE = {
-    "面试流程": """
-    我们的面试流程通常包括以下几个阶段：
-    1. **简历筛选**：HR 会根据岗位要求筛选简历
-    2. **电话面试**：初步了解候选人的基本情况和意向
-    3. **技术面试**：1-2 轮技术面试，考察专业技能
-    4. **HR 面试**：了解软实力、薪资期望等
-    5. **Offer 发放**：通过后 3-5 个工作日内发放 Offer
-    
-    面试周期通常为 1-2 周。
-    """,
-    
-    "STAR法则": """
-    STAR 法则是面试中回答行为问题的经典方法：
-    - **S (Situation)**：描述当时的情况和背景
-    - **T (Task)**：说明你需要完成的任务或挑战
-    - **A (Action)**：详细说明你采取的具体行动
-    - **R (Result)**：展示最终的成果和收获
-    
-    示例：
-    "在上一家公司，我们的项目遇到性能瓶颈 (S)。作为技术负责人，我需要在一周内优化系统性能 (T)。
-    我通过代码分析定位到数据库查询问题，重新设计了索引并引入缓存机制 (A)。
-    最终响应时间从 2 秒降低到 200ms，用户满意度提升了 30% (R)。"
-    """,
-    
-    "技术面试准备": """
-    技术面试的准备建议：
-    1. **基础知识**：确保数据结构、算法、操作系统等基础扎实
-    2. **项目经验**：准备 2-3 个有深度的项目案例，能讲清楚技术选型和难点
-    3. **编程能力**：多刷 LeetCode，重点是中等难度题
-    4. **系统设计**：了解常见的架构模式，如微服务、消息队列等
-    5. **沟通能力**：清晰表达思路，展现思维过程
-    
-    面试时记得带笔记本和简历副本。
-    """,
-    
-    "常见问题": """
-    常见面试问题及应对策略：
-    
-    1. **自我介绍**：
-       - 简明扼要，控制在 2 分钟内
-       - 突出与岗位相关的经验
-       - 以亮点结尾，引导面试官提问
-    
-    2. **离职原因**：
-       - 积极正面，不抱怨前公司
-       - 强调个人成长和职业发展
-    
-    3. **职业规划**：
-       - 展现长期稳定性
-       - 说明如何与公司发展对齐
-    
-    4. **薪资期望**：
-       - 提前了解市场行情
-       - 给出合理范围，留有谈判空间
-    """,
-    
-    "简历优化": """
-    简历优化的核心要点：
-    
-    1. **格式**：
-       - 使用 PDF 格式，确保跨平台显示一致
-       - 字体选择：黑体/微软雅黑（标题），宋体（正文）
-       - 页数：1-2 页最佳
-    
-    2. **内容结构**：
-       - 个人信息（姓名、联系方式、求职意向）
-       - 教育背景
-       - 工作经历（重点！使用 STAR 法则描述）
-       - 项目经验
-       - 技能清单
-    
-    3. **关键词优化**：
-       - 针对岗位 JD 提取关键词
-       - 在简历中自然融入这些关键词
-    
-    4. **量化成果**：
-       - 使用数字说话：提升 30%、节省 20 小时/周
-       - 避免空洞的形容词
+# Chroma 数据库路径
+CHROMA_DB_PATH = Path(__file__).parent.parent / "rag" / "chroma_db"
+
+# 全局变量：向量数据库实例（懒加载）
+_vectorstore = None
+
+
+def get_vectorstore():
     """
-}
+    获取向量数据库实例（单例模式）
+    """
+    global _vectorstore
+    
+    if _vectorstore is None:
+        # 检查数据库是否存在
+        if not CHROMA_DB_PATH.exists():
+            raise FileNotFoundError(
+                f"向量数据库不存在: {CHROMA_DB_PATH}\n"
+                f"请先运行初始化脚本: python backend/graph/rag/init_vectorstore.py"
+            )
+        
+        # 加载向量数据库
+        _vectorstore = Chroma(
+            persist_directory=str(CHROMA_DB_PATH),
+            embedding_function=openai_embeddings,
+            collection_name="interview_knowledge"
+        )
+    
+    return _vectorstore
 
 
-@tool
+@tool("search_knowledge_base")
 def search_knowledge_base(query: str) -> str:
     """
-    从私有知识库中检索面试相关信息。
+    从私有向量知识库中检索面试相关信息（使用 RAG 技术）。
+    
+    该工具使用语义检索技术，能够理解用户问题的含义，找到最相关的知识点。
+    知识库包含：简历优化、自我介绍、行为面试、薪资谈判、STAR法则、技术面试等内容。
     
     Args:
-        query: 用户的问题或查询关键词
+        query: 用户的问题或查询关键词，例如"如何写简历"、"怎么谈薪资"、"STAR法则是什么"
         
     Returns:
         str: 检索到的相关内容，如果没有找到则返回 "无相关信息"
     """
-    print(f"[Consultant Agent - search_knowledge_base] 开始检索，查询: {query}")
+    print(f"[Consultant Agent - search_knowledge_base] 开始向量检索，查询: {query}")
     
-    # 简单的关键词匹配（实际可以用向量检索或更复杂的语义匹配）
-    query_lower = query.lower()
-    
-    # 关键词到知识条目的映射
-    keyword_mapping = {
-        "流程": "面试流程",
-        "阶段": "面试流程",
-        "周期": "面试流程",
-        "star": "STAR法则",
-        "行为问题": "STAR法则",
-        "技术面试": "技术面试准备",
-        "准备": "技术面试准备",
-        "算法": "技术面试准备",
-        "自我介绍": "常见问题",
-        "离职": "常见问题",
-        "职业规划": "常见问题",
-        "薪资": "常见问题",
-        "简历": "简历优化",
-        "优化": "简历优化",
-        "格式": "简历优化"
-    }
-    
-    # 查找匹配的知识条目
-    matched_content = []
-    matched_keys = []
-    for keyword, kb_key in keyword_mapping.items():
-        if keyword in query_lower:
-            if kb_key in KNOWLEDGE_BASE and KNOWLEDGE_BASE[kb_key] not in matched_content:
-                matched_content.append(KNOWLEDGE_BASE[kb_key])
-                matched_keys.append(kb_key)
-    
-    if matched_content:
-        print(f"[Consultant Agent - search_knowledge_base] ✅ 找到 {len(matched_content)} 条匹配内容: {', '.join(matched_keys)}")
-        return "\n\n".join(matched_content)
-    else:
-        print(f"[Consultant Agent - search_knowledge_base] ❌ 未找到相关内容，返回'无相关信息'")
+    try:
+        # 获取向量数据库
+        vectorstore = get_vectorstore()
+        
+        # 语义检索（返回最相关的 2 个文档块）
+        results = vectorstore.similarity_search_with_score(query, k=2)
+        
+        if not results:
+            print(f"[Consultant Agent - search_knowledge_base] ❌ 未找到相关内容")
+            return "无相关信息"
+        
+        # 过滤相似度过低的结果（score 越小越相似，< 0.8 表示相关）
+        relevant_results = [(doc, score) for doc, score in results if score < 0.8]
+        
+        if not relevant_results:
+            print(f"[Consultant Agent - search_knowledge_base] ❌ 相似度不足（最佳相似度: {results[0][1]:.3f}，需要 < 0.8），触发联网搜索")
+            return "无相关信息"
+        
+        # 合并检索结果
+        matched_content = []
+        for doc, score in relevant_results:
+            print(f"[Consultant Agent - search_knowledge_base] ✓ 找到相关内容 (相似度: {score:.3f})")
+            matched_content.append(doc.page_content)
+        
+        result = "\n\n".join(matched_content)
+        print(f"[Consultant Agent - search_knowledge_base] ✅ 返回 {len(relevant_results)} 个相关文档块")
+        
+        return result
+        
+    except Exception as e:
+        print(f"[Consultant Agent - search_knowledge_base] ❌ 检索失败: {e}")
         return "无相关信息"
 
 
-# 导入 Tavily 搜索工具（作为兜底）
-@tool
+@tool("tavily_search")
 def tavily_search(query: str) -> str:
     """
-    使用 Tavily 联网搜索最新的面试相关信息。
+    使用 Tavily 联网搜索最新的面试相关信息（兜底机制）。
+    
+    当私有知识库中没有相关信息时，使用此工具搜索互联网上的最新内容。
+    适用于：最新的行业动态、公司面试真题、新兴技术面试题等。
     
     Args:
-        query: 搜索查询
+        query: 搜索查询，例如"2024年字节跳动面试题"、"最新的前端面试趋势"
         
     Returns:
-        str: 搜索结果
+        str: 搜索结果，包含标题、链接和摘要
     """
-    from backend.config import TAVILY_API_KEY
     from tavily import TavilyClient
+    import time
 
-    print(f"[Consultant Agent - tavily_search] 🌐 触发联网搜索（兜底机制），查询: {query}")
+    print(f"[Consultant Agent - tavily_search] 开始联网搜索，查询: {query}")
 
     if not TAVILY_API_KEY:
         print("[Consultant Agent - tavily_search] ❌ 未配置 TAVILY_API_KEY")
         return "搜索失败: 未配置 TAVILY_API_KEY"
 
-    try:
-        tavily = TavilyClient(api_key=TAVILY_API_KEY)
-        
-        # 执行搜索
-        response = tavily.search(query=query, search_depth="basic", max_results=3)
-        results = response.get("results", [])
-        
-        if results:
-            # 整理搜索结果
-            search_results = []
-            for res in results:
-                search_results.append(f"- [{res['title']}]({res['url']})\n  {res['content'][:200]}...")
+    # 重试机制
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            tavily = TavilyClient(api_key=TAVILY_API_KEY)
             
-            result_text = "\n\n".join(search_results)
-            print(f"[Consultant Agent - tavily_search] ✅ 找到 {len(results)} 个联网结果")
-            return f"【联网搜索结果】\n{result_text}"
-        else:
-            print(f"[Consultant Agent - tavily_search] ⚠️ 未找到相关信息")
-            return f"未找到关于 {query} 的相关信息"
+            # 执行搜索
+            response = tavily.search(query=query, search_depth="basic", max_results=3)
+            results = response.get("results", [])
             
-    except Exception as e:
-        print(f"[Consultant Agent - tavily_search] ❌ 搜索失败: {e}")
-        return f"搜索失败: {str(e)}"
+            if results:
+                # 整理搜索结果
+                search_results = []
+                for res in results:
+                    search_results.append(f"- [{res['title']}]({res['url']})\n  {res['content'][:200]}...")
+                
+                result_text = "\n\n".join(search_results)
+                print(f"[Consultant Agent - tavily_search] ✅ 找到 {len(results)} 个搜索结果")
+                return f"【联网搜索结果】\n{result_text}"
+            else:
+                print(f"[Consultant Agent - tavily_search] ⚠️ 未找到相关信息")
+                return f"未找到关于 {query} 的相关信息"
+                
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"[Consultant Agent - tavily_search] ⚠️ 搜索失败（第 {attempt + 1} 次），重试中...")
+                time.sleep(1)  # 等待1秒后重试
+                continue
+            else:
+                print(f"[Consultant Agent - tavily_search] ❌ 搜索失败（已重试 {max_retries} 次）: {e}")
+                return f"联网搜索暂时不可用，请稍后再试"
 
 
 # 导出工具列表（顺序很重要！优先使用知识库）

@@ -1,17 +1,11 @@
 # AI智能面试辅助系统V1.0，作者：刘梦畅
 """
 LLM 辅助工具
-提供统一的 LLM 实例
+提供统一的 LLM 实例和 Embedding 模型
 """
-import json
-from typing import Any, Dict, List
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from backend.config import (
-    OPENAI_API_KEY, MODEL_NAME, TEMPERATURE, OPENAI_API_BASE,
-    GEMINI_API_KEY, GEMINI_MODEL_NAME, GEMINI_API_BASE
+    OPENAI_API_KEY, MODEL_NAME, TEMPERATURE, OPENAI_API_BASE, EMBEDDING_MODEL
 )
 
 # ========== OpenAI LLM ==========
@@ -29,16 +23,15 @@ def get_openai_llm() -> ChatOpenAI:
 openai_llm = get_openai_llm()
 
 
-# ========== Gemini LLM ==========
-def get_gemini_llm() -> ChatGoogleGenerativeAI:
-    """获取 Gemini LLM 实例"""
-    return ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL_NAME,
-        google_api_key=GEMINI_API_KEY,
-        temperature=TEMPERATURE,
-        client_options={"api_endpoint": GEMINI_API_BASE}
+# ========== Embedding 模型 ==========
+def get_openai_embeddings() -> OpenAIEmbeddings:
+    """获取 OpenAI Embedding 模型实例（使用硅基流动平台）"""
+    return OpenAIEmbeddings(
+        openai_api_key=OPENAI_API_KEY,
+        openai_api_base=OPENAI_API_BASE,
+        model=EMBEDDING_MODEL  # 从配置文件读取
     )
 
 
 # 创建全局单例实例
-gemini_llm = get_gemini_llm()
+openai_embeddings = get_openai_embeddings()

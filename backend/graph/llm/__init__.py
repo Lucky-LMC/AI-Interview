@@ -1,3 +1,3 @@
-﻿from .llm_helper import openai_llm, gemini_llm
+﻿from .llm_helper import openai_llm, openai_embeddings
 
-__all__ = ["openai_llm", "gemini_llm"]
+__all__ = ["openai_llm", "openai_embeddings"]

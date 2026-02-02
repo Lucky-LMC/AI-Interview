@@ -70,13 +70,6 @@ async def chat_with_agent(
         # 2. 调用 Agent（带 checkpoint 支持）
         config = {"configurable": {"thread_id": thread_id}}
         
-        print(f"\n{'='*60}")
-        print(f"[API: /api/customer-service/chat] 调用 Consultant Agent")
-        print(f"  - User: {user_name}")
-        print(f"  - Thread ID: {thread_id}")
-        print(f"  - Message: {request.message}")
-        print(f"{'='*60}\n")
-        
         result = consultant_agent.invoke({
             "messages": [HumanMessage(content=request.message)]
         }, config)
