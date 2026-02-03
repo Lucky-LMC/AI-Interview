@@ -3,7 +3,7 @@
 请求响应模型 - 定义 API 的请求和响应数据结构
 """
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 
 # ========== 1. 用户认证模型 (Auth) ==========
@@ -115,6 +115,6 @@ class ConsultantRecordDetailResponse(BaseModel):
     thread_id: str = Field(..., description="会话ID")
     user_name: str = Field(..., description="用户名")
     title: str = Field(..., description="会话标题")
-    messages: List[Dict[str, str]] = Field(..., description="对话历史")
+    messages: List[Dict[str, Any]] = Field(..., description="对话历史")  # 改为 Any 以支持 tools_used 列表
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")

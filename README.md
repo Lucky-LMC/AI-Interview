@@ -21,7 +21,9 @@
 - **语义检索**：基于 BAAI/bge-large-zh-v1.5 嵌入模型进行向量检索
 - **兜底机制**：知识库无结果时自动降级到联网搜索（Tavily API）
 - **相似度过滤**：距离分数 < 0.8 才返回结果，确保检索质量
-- **对话记忆**：支持多轮对话，理解上下文
+- **流式响应**：基于 Server-Sent Events (SSE) 技术，实现打字机效果的实时流式输出
+- **异步记忆**：采用 AsyncSqliteSaver 实现非阻塞的对话状态持久化
+- **工具可视化**：实时展示 Agent 的思考过程和工具使用情况（如"正在搜索知识库"）
 
 ### 💾 双数据库架构
 - **MySQL**：存储用户信息、面试记录、顾问对话记录（业务数据）
@@ -34,19 +36,21 @@
 - **Markdown 渲染**：GitHub 风格文档面板，支持代码高亮
 - **响应式布局**：适配多种屏幕尺寸
 - **流光效果**：赛博科技风微交互动画
+- **交互体验**：实时工具调用状态展示，优雅的加载动画
 
 ## 🛠️ 技术架构
 
 ### 后端技术栈
-- **核心框架**: Python 3.9+, FastAPI
-- **AI 框架**: LangChain, LangGraph
+- **核心框架**: Python 3.9+, FastAPI (Async)
+- **AI 框架**: LangChain, LangGraph (Async)
 - **LLM**: 支持 OpenAI API 兼容接口（推荐使用 Qwen2.5-14B-Instruct）
 - **向量数据库**: Chroma（本地部署，用于 RAG 知识库）
 - **嵌入模型**: BAAI/bge-large-zh-v1.5（硅基流动平台）
 - **搜索引擎**: Tavily API（联网搜索学习资源和最新信息）
+- **通信协议**: Server-Sent Events (SSE) 实现流式传输
 - **数据库**: 
   - MySQL 8.0+（用户数据、面试记录、顾问对话记录）
-  - SQLite（LangGraph Checkpoint，对话状态持久化）
+  - SQLite + aiosqlite（LangGraph Async Checkpoint）
 - **ORM**: SQLAlchemy 2.0+
 - **文档解析**: PyPDF2
 
@@ -54,8 +58,8 @@
 - **核心**: 原生 HTML5, CSS3 (Variables + Flexbox/Grid), ES6+ JavaScript
 - **设计风格**: **Glassmorphism** (玻璃拟态) + **Cyberpunk** (赛博科技风微交互)
 - **文档渲染**: `marked.js` + GitHub-style CSS (优化版紧凑样式)
-- **通信**: RESTful API + `fetch`
-- **特性**: 响应式布局、动态流光效果、无阴影极简气泡、全屏沉浸体验、实时数据同步
+- **通信**: RESTful API + `EventSource` (SSE)
+- **特性**: 响应式布局、打字机流式效果、实时工具状态反馈、全屏沉浸体验
 
 ### 系统架构全览图
 

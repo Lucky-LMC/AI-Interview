@@ -33,6 +33,14 @@ def generate_combined_graph(show_window=False):
     
     print("正在生成系统工作流全览图...")
     
+    def get_consultant_graph():
+        """临时创建一个用于可视化的同步 Agent"""
+        from langgraph.prebuilt import create_react_agent
+        from backend.graph.llm import openai_llm
+        from backend.graph.tools.consultant_tools import consultant_tools
+        # 注意：可视化不需要 checkpointer
+        return create_react_agent(model=openai_llm, tools=consultant_tools)
+
     graphs = [
         {
             "name": "面试工作流",
@@ -41,7 +49,7 @@ def generate_combined_graph(show_window=False):
         },
         {
             "name": "客服 Agent",
-            "import": lambda: __import__('backend.graph.agents.consultant_agent', fromlist=['consultant_agent']).consultant_agent,
+            "import": get_consultant_graph,
             "title": "面试顾问智能体\n(consultant_agent)"
         }
     ]

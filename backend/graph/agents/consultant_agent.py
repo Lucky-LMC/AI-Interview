@@ -5,8 +5,8 @@
 支持对话记忆功能
 """
 from langgraph.prebuilt import create_react_agent
-from langgraph.checkpoint.sqlite import SqliteSaver
-import sqlite3
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+import aiosqlite
 from backend.graph.llm import openai_llm
 from backend.graph.tools.consultant_tools import consultant_tools
 
@@ -69,28 +69,38 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - **禁止在知识库无结果时不调用联网搜索！**
 """
 
-# 创建全局 SQLite checkpointer（与面试工作流共享同一个数据库）
-_consultant_db_connection = sqlite3.connect("checkpoints-sqlite/checkpoints.sqlite", check_same_thread=False)
-_consultant_checkpointer = SqliteSaver(_consultant_db_connection)
+# 创建全局 AsyncSQLite checkpointer（与面试工作流共享同一个数据库）
+# 注意：AsyncSqliteSaver 需要异步初始化，所以这里只定义路径
+_consultant_db_path = "checkpoints-sqlite/checkpoints.sqlite"
+_consultant_checkpointer = None
+_consultant_agent_with_checkpointer = None
 
 
-def create_consultant_agent():
+async def get_consultant_checkpointer():
     """
-    创建面试顾问 Agent
+    获取或创建 AsyncSqliteSaver 实例（单例模式）
+    """
+    global _consultant_checkpointer
+    if _consultant_checkpointer is None:
+        # 异步创建连接
+        conn = await aiosqlite.connect(_consultant_db_path, check_same_thread=False)
+        _consultant_checkpointer = AsyncSqliteSaver(conn)
+    return _consultant_checkpointer
+
+
+async def get_consultant_agent():
+    """
+    获取或创建带 checkpointer 的 Agent（单例模式）
     
-    使用 LangGraph 的 create_react_agent 创建一个可以调用工具的 Agent
-    添加 checkpointer 支持对话记忆
-    使用 Gemini 模型（工具调用更稳定）
-    返回的是一个 CompiledGraph
+    这个函数确保 Agent 只创建一次，并且使用异步 checkpointer
     """
-    agent = create_react_agent(
-        model=openai_llm,
-        tools=consultant_tools,
-        prompt=CONSULTANT_AGENT_PROMPT,
-        checkpointer=_consultant_checkpointer  # 添加 checkpoint 支持
-    )
-    return agent
-
-
-# 创建全局 Agent 实例
-consultant_agent = create_consultant_agent()
+    global _consultant_agent_with_checkpointer
+    if _consultant_agent_with_checkpointer is None:
+        checkpointer = await get_consultant_checkpointer()
+        _consultant_agent_with_checkpointer = create_react_agent(
+            model=openai_llm,
+            tools=consultant_tools,
+            prompt=CONSULTANT_AGENT_PROMPT,
+            checkpointer=checkpointer
+        )
+    return _consultant_agent_with_checkpointer

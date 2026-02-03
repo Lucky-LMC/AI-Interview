@@ -42,3 +42,6 @@ typing-extensions>=4.0.0
 # Vector Database (RAG)
 chromadb>=0.4.22
 langchain-chroma>=0.1.0
+
+# Async SQLite (for streaming)
+aiosqlite>=0.19.0
