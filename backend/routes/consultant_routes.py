@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 from typing import Optional
 from backend.graph.agents.consultant_agent import get_consultant_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from backend.models.schemas import (
     ChatRequest, 
     ChatResponse,
@@ -17,15 +17,9 @@ from backend.models.schemas import (
 )
 from backend.config import SessionLocal
 from backend.models import ConsultantRecord
-import sqlite3
-from pathlib import Path
 from fastapi.responses import StreamingResponse
 import json
 from datetime import datetime
-
-# LangGraph checkpoints 数据库路径（与 interview_routes 保持一致）
-CHECKPOINTS_DIR = Path(__file__).parent.parent.parent / "checkpoints-sqlite"
-CHECKPOINT_DB = CHECKPOINTS_DIR / "checkpoints.sqlite"
 
 router = APIRouter(prefix="/api/customer-service", tags=["customer-service"])
 
@@ -37,145 +31,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-# ====================================================================
-# 旧版本（非流式）- 已暂时禁用，被下方的流式版本替代
-# 如需恢复非流式版本，可以取消注释并修改路由路径为 /chat-sync
-# ====================================================================
-# @router.post("/chat", response_model=ChatResponse)
-# async def chat_with_agent(
-#     request: ChatRequest,
-#     user_name: Optional[str] = Header(None, alias="X-User-Name"),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     与智能面试客服对话
-    
-#     Args:
-#         request: 包含用户消息和可选的 thread_id
-#         user_name: 用户名（从 Header 获取）
-#         db: 数据库会话
-        
-#     Returns:
-#         ChatResponse: Agent 的回复和 thread_id
-#     """
-#     try:
-#         if not request.message or not request.message.strip():
-#             raise HTTPException(status_code=400, detail="消息不能为空")
-        
-#         if not user_name:
-#             raise HTTPException(status_code=401, detail="需要登录")
-        
-#         # 1. 确定 thread_id
-#         if request.thread_id:
-#             thread_id = request.thread_id
-#         else:
-#             # 新会话，生成新的 thread_id
-#             thread_id = f"consultant-{uuid.uuid4()}"
-        
-#         # 2. 调用 Agent（带 checkpoint 支持）
-#         config = {"configurable": {"thread_id": thread_id}}
-        
-#         result = consultant_agent.invoke({
-#             "messages": [HumanMessage(content=request.message)]
-#         }, config)
-        
-#         # 3. 提取回复
-#         if result and "messages" in result:
-#             last_message = result["messages"][-1]
-#             reply = last_message.content
-            
-#             # 4. 保存到数据库
-#             try:
-#                 # 提取消息：保存所有用户消息 + 每轮的最后一条AI回复
-#                 # 策略：遍历消息，遇到 human 就保存，遇到 ai 就暂存，直到下一个 human 或结束
-                
-#                 messages_to_save = []
-#                 last_ai_message = None
-                
-#                 for msg in result["messages"]:
-#                     if not hasattr(msg, 'type'):
-#                         continue
-                    
-#                     if msg.type == 'human':
-#                         # 如果之前有AI消息，先保存它
-#                         if last_ai_message:
-#                             messages_to_save.append(last_ai_message)
-#                             last_ai_message = None
-                        
-#                         # 保存用户消息
-#                         if msg.content and msg.content.strip():
-#                             messages_to_save.append({
-#                                 "role": "human",
-#                                 "content": msg.content
-#                             })
-                    
-#                     elif msg.type == 'ai':
-#                         # 暂存AI消息（只保留最后一条非空的）
-#                         if msg.content and msg.content.strip():
-#                             last_ai_message = {
-#                                 "role": "ai",
-#                                 "content": msg.content
-#                             }
-                
-#                 # 保存最后一条AI消息
-#                 if last_ai_message:
-#                     messages_to_save.append(last_ai_message)
-                
-#                 # 查询是否已有记录
-#                 record = db.query(ConsultantRecord).filter(
-#                     ConsultantRecord.thread_id == thread_id
-#                 ).first()
-                
-#                 if record:
-#                     # 更新已有记录
-#                     record.messages = messages_to_save
-#                     from datetime import datetime
-#                     record.updated_at = datetime.now()
-#                 else:
-#                     # 创建新记录
-#                     # 生成标题：从第一条用户消息提取（前20个字符）
-#                     title = "新咨询会话"
-#                     if messages_to_save:
-#                         first_user_msg = next((m for m in messages_to_save if m['role'] == 'human'), None)
-#                         if first_user_msg and first_user_msg['content']:
-#                             content = first_user_msg['content'].strip()
-#                             title = content[:20] + ('...' if len(content) > 20 else '')
-                    
-#                     record = ConsultantRecord(
-#                         thread_id=thread_id,
-#                         user_name=user_name,
-#                         title=title,
-#                         messages=messages_to_save
-#                     )
-#                     db.add(record)
-                
-#                 db.commit()
-#             except Exception as db_e:
-#                 db.rollback()
-#                 print(f"保存顾问对话记录失败: {db_e}")
-#                 # 不影响返回结果
-#         else:
-#             reply = "抱歉，我现在无法回答这个问题。请稍后重试。"
-        
-#         return ChatResponse(
-#             reply=reply,
-#             thread_id=thread_id,
-#             success=True
-#         )
-        
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         print(f"客服对话错误：{str(e)}")
-#         import traceback
-#         traceback.print_exc()
-        
-#         raise HTTPException(
-#             status_code=500,
-#             detail=f"处理您的请求时出现了错误: {str(e)}"
-#         )
 
 
 # ====================================================================
@@ -221,46 +76,66 @@ async def chat_with_agent_stream(
     async def event_generator():
         db = SessionLocal()
         try:
-            # 一次性获取 Agent（无记忆版本）
+            # 获取 Agent（无记忆版本）
             agent = await get_consultant_agent()
             
-            # 不再使用 config，因为没有 checkpointer
-            # config = {
-            #     "configurable": {
-            #         "thread_id": thread_id
-            #     }
-            # }
+            # 手动记忆管理：从数据库加载最近2轮对话作为上下文
+            history_messages = []
+            
+            if request.thread_id:
+                # 如果是继续对话，加载历史
+                try:
+                    record = db.query(ConsultantRecord).filter(
+                        ConsultantRecord.thread_id == thread_id,
+                        ConsultantRecord.user_name == user_name
+                    ).first()
+                    
+                    if record and record.messages:
+                        # 取最后2轮对话（4条消息：用户+AI+用户+AI）
+                        recent_messages = record.messages[-4:] if len(record.messages) > 4 else record.messages
+                        
+                        # 转换为 LangChain 消息格式
+                        for msg in recent_messages:
+                            if msg['role'] == 'human':
+                                history_messages.append(HumanMessage(content=msg['content']))
+                            elif msg['role'] == 'ai':
+                                history_messages.append(AIMessage(content=msg['content']))
+                        
+                        print(f"[Consultant] 加载历史上下文: {len(history_messages)} 条消息")
+                except Exception as e:
+                    print(f"[Consultant] 加载历史失败，使用空上下文: {e}")
+                    history_messages = []
+            
+            # 构建完整的消息列表：历史 + 当前用户消息
+            full_messages = history_messages + [HumanMessage(content=request.message)]
             
             # 立即返回 thread_id
             yield f"data: {json.dumps({'type': 'thread_id', 'content': thread_id}, ensure_ascii=False)}\n\n"
             
-            print(f"[Consultant] 开始流式对话，thread_id={thread_id}, user={user_name}")
+            print(f"\n{'='*50}")
+            print(f"[Consultant] 🗣️ 用户提问: {request.message}")
+            if history_messages:
+                print(f"[Consultant] 📜 加载历史: {len(history_messages)} 条消息")
+            print(f"{'='*50}\n")
             
             full_response = ""
             tools_used = []  # 记录本轮对话使用的工具
             event_count = 0
             
-            # 使用 astream_events 监听流式事件（不传 config）
+            # 使用 astream_events 监听流式事件（不传 config，无自动记忆）
             async for event in agent.astream_events(
-                {"messages": [HumanMessage(content=request.message)]},
+                {"messages": full_messages},  # 手动传入完整消息历史
                 version="v2"
             ):
                 kind = event["event"]
                 event_count += 1
-                
-                # 详细日志：打印所有事件类型（调试用）
-                if kind not in ["on_chat_model_stream"]:  # 避免 token 日志刷屏
-                    print(f"[Consultant] 事件 {event_count}: {kind}")
                 
                 # 监听 LLM 的流式输出
                 if kind == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if chunk.content:
                         content = chunk.content
-                        # 过滤工具调用相关的内容：
-                        # 1. 完整标记：<tool_call>, </tool_call>
-                        # 2. 单字符片段：单独的 }, <, >, /
-                        # 3. 可疑的短内容：}\n, }\r\n 等
+                        # 过滤工具调用相关的内容
                         is_tool_marker = (
                             '<tool_call>' in content or 
                             '</tool_call>' in content or
@@ -274,9 +149,9 @@ async def chat_with_agent_stream(
                 # 监听工具调用开始
                 elif kind == "on_tool_start":
                     tool_name = event["name"]
-                    print(f"[Consultant] 🛠️ 工具调用: {tool_name}")  # 详细日志
+                    print(f"[Consultant] 🛠️ Consultant Agent 正在调用工具: {tool_name}")
                     
-                    # 记录工具使用（检查多种可能的工具名称）
+                    # 记录工具使用
                     if "knowledge" in tool_name.lower():
                         if "knowledge_base" not in tools_used:
                             tools_used.append("knowledge_base")
@@ -286,88 +161,87 @@ async def chat_with_agent_stream(
                             tools_used.append("tavily_search")
                         status_msg = "🌐 正在联网搜索..."
                     else:
-                        # 其他未知工具，也记录下来
                         if tool_name not in tools_used:
                             tools_used.append(tool_name)
                         status_msg = f"🛠️ 正在使用工具: {tool_name}"
                     
                     yield f"data: {json.dumps({'type': 'status', 'content': status_msg}, ensure_ascii=False)}\n\n"
                 
-                # 监听工具调用结束（清空状态，让前端准备接收内容）
+                # 监听工具调用结束
                 elif kind == "on_tool_end":
-                    # 清空状态提示，准备接收 LLM 输出
                     yield f"data: {json.dumps({'type': 'status', 'content': ''}, ensure_ascii=False)}\n\n"
             
-            print(f"[Consultant] 事件循环结束，共处理 {event_count} 个事件，生成 {len(full_response)} 字符")
+            print(f"[Consultant] 🤖 回答生成完毕 (长度: {len(full_response)} 字符)")
             
-            # 如果没有生成内容，记录日志但不重试（避免重复发送消息导致对话混乱）
-            if not full_response.strip():
-                print(f"[Consultant] ⚠️ 流式输出为空，可能是 Agent 认为无需回答或已在之前回答过")
-
             # 流式输出结束标记（同时返回工具使用信息）
             yield f"data: {json.dumps({'type': 'done', 'content': '', 'tools_used': tools_used}, ensure_ascii=False)}\n\n"
             
-            print(f"[Consultant] 流式输出完成，开始保存数据库")
-            
-            # 3. 保存到数据库（不使用 checkpoint，直接保存当前对话）
-            try:
-                # 构建要保存的消息
-                messages_to_save = []
+            # 3. 只有在真正成功生成回复后才保存到数据库（不保存空响应）
+            if full_response.strip():
+                print(f"[Consultant] 流式输出完成，开始保存数据库")
                 
-                # 查询已有记录
-                record = db.query(ConsultantRecord).filter(
-                    ConsultantRecord.thread_id == thread_id,
-                    ConsultantRecord.user_name == user_name
-                ).first()
-                
-                # 如果有已有记录，保留历史消息
-                if record and record.messages:
-                    messages_to_save = record.messages.copy()
-                
-                # 添加当前对话
-                messages_to_save.append({
-                    "role": "human",
-                    "content": request.message
-                })
-                
-                if full_response.strip():
+                try:
+                    # 构建要保存的消息
+                    messages_to_save = []
+                    
+                    # 查询已有记录
+                    record = db.query(ConsultantRecord).filter(
+                        ConsultantRecord.thread_id == thread_id,
+                        ConsultantRecord.user_name == user_name
+                    ).first()
+                    
+                    # 如果有已有记录，保留历史消息
+                    if record and record.messages:
+                        messages_to_save = record.messages.copy()
+                    
+                    # 添加当前对话
+                    messages_to_save.append({
+                        "role": "human",
+                        "content": request.message
+                    })
+                    
                     messages_to_save.append({
                         "role": "ai",
                         "content": full_response,
                         "tools_used": tools_used
                     })
-                
-                print(f"[Consultant] 准备保存 {len(messages_to_save)} 条消息，工具使用: {tools_used}")
-                
-                # 查询或创建记录
-                if record:
-                    # 更新已有记录
-                    record.messages = messages_to_save
-                    record.updated_at = datetime.now()
-                else:
-                    # 生成标题（使用第一条用户消息）
-                    title = "新咨询会话"
-                    if messages_to_save:
-                        first_user_msg = next((m for m in messages_to_save if m['role'] == 'human'), None)
-                        if first_user_msg and first_user_msg['content']:
-                            content = first_user_msg['content'].strip()
-                            title = content[:20] + ('...' if len(content) > 20 else '')
                     
-                    record = ConsultantRecord(
-                        thread_id=thread_id,
-                        user_name=user_name,
-                        title=title,
-                        messages=messages_to_save
-                    )
-                    db.add(record)
-                
-                db.commit()
-                print(f"[Consultant] 数据库保存成功")
-            except Exception as db_error:
-                print(f"[Consultant] 数据库保存失败: {db_error}")
-                import traceback
-                traceback.print_exc()
-                db.rollback()
+                    print(f"[Consultant] 准备保存 {len(messages_to_save)} 条消息，工具使用: {tools_used}")
+                    
+                    # 查询或创建记录
+                    if record:
+                        # 更新已有记录
+                        record.messages = messages_to_save
+                        record.updated_at = datetime.now()
+                    else:
+                        # 生成标题
+                        title = "新咨询会话"
+                        if messages_to_save:
+                            first_user_msg = next((m for m in messages_to_save if m['role'] == 'human'), None)
+                            if first_user_msg and first_user_msg['content']:
+                                content = first_user_msg['content'].strip()
+                                title = content[:20] + ('...' if len(content) > 20 else '')
+                        
+                        record = ConsultantRecord(
+                            thread_id=thread_id,
+                            user_name=user_name,
+                            title=title,
+                            messages=messages_to_save
+                        )
+                        db.add(record)
+                    
+                    db.commit()
+                    print(f"[Consultant] 数据库保存成功")
+                except Exception as db_error:
+                    print(f"[Consultant] 数据库保存失败: {db_error}")
+                    import traceback
+                    traceback.print_exc()
+                    db.rollback()
+            else:
+                print(f"[Consultant] ⚠️ 响应为空，跳过数据库保存")
+                # 可选：发送一个特定的错误提示给前端
+                fallback_msg = "抱歉，我暂时无法回答这个问题。可能是需要的信息未找到。您可以尝试换个方式提问。"
+                yield f"data: {json.dumps({'type': 'token', 'content': fallback_msg}, ensure_ascii=False)}\n\n"
                 
         except Exception as e:
             print(f"[Consultant] 流式对话错误：{e}")
@@ -473,20 +347,7 @@ async def delete_consultant_record(
             raise HTTPException(status_code=404, detail="对话记录不存在或无权删除")
         
         
-        # 2. 删除 LangGraph 会话记录 (SQLite)
-        try:
-            if CHECKPOINT_DB.exists():
-                conn = sqlite3.connect(str(CHECKPOINT_DB))
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
-                cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
-                conn.commit()
-                conn.close()
-                print(f"[删除检查点] 成功删除顾问会话记录: thread_id={thread_id}")
-        except Exception as e:
-            print(f"[删除检查点] 删除顾问会话记录失败: {e}")
-
-        # 3. 删除数据库记录 (MySQL)
+        # 2. 删除数据库记录 (MySQL)
         db.delete(record)
         db.commit()
         

@@ -44,17 +44,9 @@ def get_vectorstore():
 def search_knowledge_base(query: str) -> str:
     """
     从私有向量知识库中检索面试相关信息（使用 RAG 技术）。
-    
-    该工具使用语义检索技术，能够理解用户问题的含义，找到最相关的知识点。
-    知识库包含：简历优化、自我介绍、行为面试、薪资谈判、STAR法则、技术面试等内容。
-    
-    Args:
-        query: 用户的问题或查询关键词，例如"如何写简历"、"怎么谈薪资"、"STAR法则是什么"
-        
-    Returns:
-        str: 检索到的相关内容，如果没有找到则返回 "无相关信息"
+    ...
     """
-    print(f"[Consultant Agent - search_knowledge_base] 开始向量检索，查询: {query}")
+    print(f"[Consultant] 📖 知识库检索内容: {query}")
     
     try:
         # 获取向量数据库
@@ -64,29 +56,30 @@ def search_knowledge_base(query: str) -> str:
         results = vectorstore.similarity_search_with_score(query, k=2)
         
         if not results:
-            print(f"[Consultant Agent - search_knowledge_base] ❌ 未找到相关内容")
+            print(f"[Consultant] ❌ 知识库未命中 (无结果)")
             return "知识库中没有找到相关内容。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
         
-        # 过滤相似度过低的结果（score 越小越相似，< 0.8 表示相关）
-        relevant_results = [(doc, score) for doc, score in results if score < 0.8]
+        # 过滤相似度过低的结果（score 越小越相似）
+        # 调整阈值：0.8 -> 0.6（更严格，避免匹配到不相关的通用内容）
+        threshold = 0.6
+        relevant_results = [(doc, score) for doc, score in results if score < threshold]
         
         if not relevant_results:
-            print(f"[Consultant Agent - search_knowledge_base] ❌ 相似度不足（最佳相似度: {results[0][1]:.3f}，需要 < 0.8），触发联网搜索")
+            print(f"[Consultant] ❌ 知识库未命中 (最佳相似度: {results[0][1]:.3f} > {threshold})")
             return "知识库中没有找到相关内容。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
         
         # 合并检索结果
         matched_content = []
         for doc, score in relevant_results:
-            print(f"[Consultant Agent - search_knowledge_base] ✓ 找到相关内容 (相似度: {score:.3f})")
+            preview = doc.page_content[:100].replace('\n', ' ') + "..."
+            print(f"[Consultant] ✅ 命中知识片段 (Score: {score:.3f}): {preview}")
             matched_content.append(doc.page_content)
         
         result = "\n\n".join(matched_content)
-        print(f"[Consultant Agent - search_knowledge_base] ✅ 返回 {len(relevant_results)} 个相关文档块")
-        
         return result
         
     except Exception as e:
-        print(f"[Consultant Agent - search_knowledge_base] ❌ 检索失败: {e}")
+        print(f"[Consultant] ❌ 知识库检索错误: {e}")
         import traceback
         traceback.print_exc()
         return "知识库检索失败。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
@@ -96,23 +89,15 @@ def search_knowledge_base(query: str) -> str:
 def tavily_search(query: str) -> str:
     """
     使用 Tavily 联网搜索最新的面试相关信息（兜底机制）。
-    
-    当私有知识库中没有相关信息时，使用此工具搜索互联网上的最新内容。
-    适用于：最新的行业动态、公司面试真题、新兴技术面试题等。
-    
-    Args:
-        query: 搜索查询，例如"2024年字节跳动面试题"、"最新的前端面试趋势"
-        
-    Returns:
-        str: 搜索结果，包含标题、链接和摘要
+    ...
     """
     from tavily import TavilyClient
     import time
 
-    print(f"[Consultant Agent - tavily_search] 开始联网搜索，查询: {query}")
+    print(f"[Consultant] 🌐 联网搜索内容: {query}")
 
     if not TAVILY_API_KEY:
-        print("[Consultant Agent - tavily_search] ❌ 未配置 TAVILY_API_KEY")
+        print("[Consultant] ❌ 未配置 TAVILY_API_KEY")
         return "搜索失败: 未配置 TAVILY_API_KEY"
 
     # 重试机制
@@ -128,23 +113,24 @@ def tavily_search(query: str) -> str:
             if results:
                 # 整理搜索结果
                 search_results = []
+                print(f"[Consultant] ✅ 联网搜索成功，找到 {len(results)} 条结果:")
                 for res in results:
+                    print(f"  - [{res['title']}] {res['url']}")
                     search_results.append(f"- [{res['title']}]({res['url']})\n  {res['content'][:200]}...")
                 
                 result_text = "\n\n".join(search_results)
-                print(f"[Consultant Agent - tavily_search] ✅ 找到 {len(results)} 个搜索结果")
                 return f"【联网搜索结果】\n{result_text}"
             else:
-                print(f"[Consultant Agent - tavily_search] ⚠️ 未找到相关信息")
+                print(f"[Consultant] ⚠️ 联网搜索未找到结果")
                 return f"未找到关于 {query} 的相关信息"
                 
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"[Consultant Agent - tavily_search] ⚠️ 搜索失败（第 {attempt + 1} 次），重试中...")
+                print(f"[Consultant] ⚠️ 搜索失败（第 {attempt + 1} 次），重试中...")
                 time.sleep(1)  # 等待1秒后重试
                 continue
             else:
-                print(f"[Consultant Agent - tavily_search] ❌ 搜索失败（已重试 {max_retries} 次）: {e}")
+                print(f"[Consultant] ❌ 搜索失败（已重试 {max_retries} 次）: {e}")
                 return f"联网搜索暂时不可用，请稍后再试"
 
 

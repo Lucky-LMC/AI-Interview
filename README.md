@@ -19,15 +19,14 @@
 ### 🔍 RAG 智能顾问系统
 - **私有知识库**：使用 Chroma 向量数据库存储面试知识（本地部署）
 - **语义检索**：基于 BAAI/bge-large-zh-v1.5 嵌入模型进行向量检索
-- **兜底机制**：知识库无结果时自动降级到联网搜索（Tavily API）
-- **相似度过滤**：距离分数 < 0.8 才返回结果，确保检索质量
+- **兜底机制**：知识库无结果或相似度不足（Score < 0.6）时自动降级到联网搜索（Tavily API）
+- **显式记忆**：采用基于滑动窗口的显式上下文管理（最近2轮），替代不稳定的自动Checkpoint，彻底解决拒答问题
 - **流式响应**：基于 Server-Sent Events (SSE) 技术，实现打字机效果的实时流式输出
-- **异步记忆**：采用 AsyncSqliteSaver 实现非阻塞的对话状态持久化
-- **工具可视化**：实时展示 Agent 的思考过程和工具使用情况（如"正在搜索知识库"）
+- **工具可视化**：实时展示 Agent 的思考过程和工具使用情况
 
 ### 💾 双数据库架构
-- **MySQL**：存储用户信息、面试记录、顾问对话记录（业务数据）
-- **SQLite**：存储 LangGraph Checkpoint（对话状态和记忆）
+- **MySQL**：核心存储，保存用户信息、面试记录、顾问对话记录（含完整上下文）
+- **SQLite**：仅用于主面试流程的复杂工作流状态快照（LangGraph Checkpoint）
 - **数据同步**：创建、更新、删除操作同时作用于两个数据库
 - **历史记录**：支持查询、恢复、删除历史会话
 
@@ -356,7 +355,8 @@ python backend/utils/workflow_visualizer.py
 - created_at / updated_at
 
 #### 2. SQLite（Checkpoint 数据库）
-存储 LangGraph 的对话状态和记忆，位于 `checkpoints-sqlite/checkpoints.sqlite`：
+存储 LangGraph 的主面试流程对话状态（Interview Workflow），位于 `checkpoints-sqlite/checkpoints.sqlite`。
+**注意：顾问 Agent（Conslutant）不再使用此数据库，改用手动记忆管理。**
 
 **checkpoints 表**：Agent 执行的每个状态快照
 - thread_id（会话ID）
@@ -424,14 +424,15 @@ python -m backend.utils.sync_checkpoints_with_mysql
   - 按 Markdown 标题切分文档，提高检索精度
 - **语义检索**：
   - 理解用户问题的语义，而非简单关键词匹配
-  - 相似度阈值：距离分数 < 0.8（越小越相似）
+  - 相似度阈值：距离分数 < 0.6（越小越相似，严格过滤通用内容）
   - 返回最相关的 2 个文档块
 - **兜底机制**：
   - 知识库无结果或相似度不足时，自动调用 Tavily API 联网搜索
-  - 重试机制：搜索失败时自动重试 3 次
+  - 强制工具调用：Agent 必须使用工具获取信息，禁止瞎编
 - **对话记忆**：
-  - 使用 LangGraph Checkpoint 存储对话状态
-  - 支持多轮对话，理解上下文
+  - **显式上下文注入**：每次请求自动加载并注入最近 2 轮历史对话
+  - **Stateless Agent**：Agent 本身无状态，避免历史包袱导致的拒答
+  - 支持多轮对话，精准理解上下文（如"它"指代什么）
 - **知识库更新**：
   - 手动更新模式：修改 `backend/graph/rag/interview_knowledge_base.md` 后
   - 运行 `python backend/graph/rag/init_vectorstore.py` 重新初始化向量数据库
