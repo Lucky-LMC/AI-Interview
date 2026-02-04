@@ -34,7 +34,7 @@ MODEL_NAME = get_required_env("MODEL_NAME")
 TEMPERATURE = float(get_required_env("TEMPERATURE"))
 
 # Embedding 模型名称
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 
 # ========== LangSmith 配置 ==========
 # LangSmith API 密钥（用于追踪和调试）

@@ -1,7 +1,6 @@
 ﻿# AI智能面试辅助系统V1.0，作者刘梦畅
 """
 FastAPI 主入口文件
-python -m http.server 8080 -d frontend
 """
 import sys
 from pathlib import Path

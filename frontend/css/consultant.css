@@ -43,7 +43,6 @@
 }
 
 /* 输入框区域微调 */
-/* 输入框区域微调 */
 .chat-input-container {
     /* 已经通过内联样式在 HTML 中覆盖了位置 */
     border-top: none !important;
@@ -118,3 +117,129 @@
 
 /* 保持 markdown 文档的标准宽度，不要覆盖 */
 /* interview.css 中已经定义了 .message-content.markdown-document 为 850px */
+
+/* ========================================= */
+/* 紧凑的聊天气泡 Markdown 样式 */
+/* ========================================= */
+
+/* 强制给所有消息气泡增加内边距 - 使用更精确的选择器 */
+.ai-message .message-content,
+.user-message .message-content {
+    padding: 16px 24px !important;
+    /* 增加左右内边距到24px */
+}
+
+.message-content.markdown-chat .message-text {
+    white-space: normal !important;
+}
+
+/* 给Markdown内容额外的左边距，防止列表贴边 */
+.message-content.markdown-chat {
+    padding-left: 28px !important;
+    /* 再多给一点左边距 */
+}
+
+/* 标题样式 - 极度紧凑，避免看起来像重复的大标题 */
+.message-content.markdown-chat h1,
+.message-content.markdown-chat h2,
+.message-content.markdown-chat h3 {
+    margin: 12px 0 6px 0;
+    font-weight: 700;
+    line-height: 1.3;
+    border: none;
+    /* 去除任何可能的底部分割线 */
+    padding-bottom: 0;
+}
+
+/* 一级二级标题统一缩小，看起来像加粗小标题 */
+.message-content.markdown-chat h1 {
+    font-size: 1.25em;
+}
+
+.message-content.markdown-chat h2 {
+    font-size: 1.15em;
+}
+
+.message-content.markdown-chat h3 {
+    font-size: 1.05em;
+}
+
+.message-content.markdown-chat h4 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 8px 0 4px 0;
+}
+
+.message-content.markdown-chat h1:first-child,
+.message-content.markdown-chat h2:first-child,
+.message-content.markdown-chat h3:first-child,
+.message-content.markdown-chat h4:first-child {
+    margin-top: 0;
+}
+
+/* 段落 - 极紧凑 */
+.message-content.markdown-chat p {
+    margin: 4px 0 !important;
+}
+
+.message-content.markdown-chat p:first-child {
+    margin-top: 0 !important;
+}
+
+.message-content.markdown-chat p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 列表 - 紧凑 */
+.message-content.markdown-chat ul,
+.message-content.markdown-chat ol {
+    margin: 4px 0 !important;
+    padding-left: 20px !important;
+}
+
+.message-content.markdown-chat li {
+    margin: 0 !important;
+    line-height: 1.5 !important;
+}
+
+.message-content.markdown-chat li>p {
+    margin: 0 !important;
+    display: inline;
+}
+
+/* 代码 */
+.message-content.markdown-chat code {
+    padding: 0.15em 0.3em;
+    font-size: 85%;
+    background-color: rgba(175, 184, 193, 0.2);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.message-content.markdown-chat pre {
+    padding: 12px;
+    margin: 8px 0;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.message-content.markdown-chat pre code {
+    padding: 0;
+    background: transparent;
+}
+
+/* 粗体和斜体 */
+.message-content.markdown-chat strong {
+    font-weight: 600;
+}
+
+/* 链接 */
+.message-content.markdown-chat a {
+    color: var(--agent-primary);
+    text-decoration: none;
+}
+
+.message-content.markdown-chat a:hover {
+    text-decoration: underline;
+}

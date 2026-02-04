@@ -101,9 +101,58 @@ function createNewSession(forceNew = true) {
     renderHistoryList();
 }
 
-// 加载会话（已废弃，保留空函数以防报错）
-function loadSession(sessionId) {
-    console.warn('loadSession is deprecated');
+// 在左侧添加临时会话占位项（用于实时反馈）
+function addTemporarySessionToSidebar(threadId, userMessage) {
+    // 检查是否已存在
+    const existing = historyContainer.querySelector(`[data-thread-id="${threadId}"]`);
+    if (existing) return;
+
+    // 查找或创建"今天"分组
+    let todaySection = null;
+    const sections = historyContainer.querySelectorAll('.history-section');
+    for (const section of sections) {
+        const titleDiv = section.querySelector('.history-title');
+        if (titleDiv && titleDiv.textContent === '今天') {
+            todaySection = section;
+            break;
+        }
+    }
+
+    if (!todaySection) {
+        todaySection = document.createElement('div');
+        todaySection.className = 'history-section';
+        todaySection.innerHTML = '<div class="history-title">今天</div>';
+        historyContainer.insertBefore(todaySection, historyContainer.firstChild);
+    }
+
+    // 创建临时占位项
+    const tempItem = document.createElement('div');
+    tempItem.className = 'chat-item active';
+    tempItem.dataset.threadId = threadId;
+
+    // 生成简短标题（取用户消息的前20个字符）
+    const title = userMessage.trim().substring(0, 20) + (userMessage.length > 20 ? '...' : '');
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    tempItem.innerHTML = `
+        <div class="chat-item-title">${title}</div>
+        <div class="chat-item-time">${timeStr}</div>
+    `;
+
+    tempItem.onclick = () => {
+        if (currentSessionId !== threadId) {
+            loadSessionFromBackend(threadId);
+        }
+    };
+
+    // 插入到"今天"分组的最前面（标题之后）
+    const firstItem = todaySection.querySelector('.chat-item');
+    if (firstItem) {
+        todaySection.insertBefore(tempItem, firstItem);
+    } else {
+        todaySection.appendChild(tempItem);
+    }
 }
 
 // 渲染历史列表
@@ -310,58 +359,13 @@ async function handleDeleteSessionFromBackend(threadId) {
 }
 
 // ====================================================================
-// 旧版本（非流式）- 已注释
+// 工具函数：获取工具显示名称
 // ====================================================================
-/*
-async function handleSendMessage_OLD() {
-    const message = userInput.value.trim();
-    if (!message) return;
-
-    // 1. UI 显示用户消息
-    addMessageToUI('user', message, true);
-    userInput.value = '';
-    userInput.style.height = 'auto';
-    checkInputEmpty();
-
-    // 2. 显示加载
-    showLoading();
-
-    try {
-        const auth = getAuth();
-        const response = await fetch(`${API_BASE_URL.replace('/api/interview', '/api/customer-service')}/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Name': auth ? auth.userName : ''
-            },
-            body: JSON.stringify({
-                message: message,
-                thread_id: currentSessionId,
-                user_name: auth ? auth.userName : 'User'
-            })
-        });
-
-        const data = await response.json();
-        hideLoading();
-
-        if (data.success) {
-            if (data.thread_id) {
-                currentSessionId = data.thread_id;
-            }
-
-            addMessageToUI('ai', data.reply, true);
-            renderHistoryList();
-        } else {
-            addMessageToUI('ai', '抱歉，服务暂时不可用。', true);
-        }
-
-    } catch (error) {
-        console.error(error);
-        hideLoading();
-        addMessageToUI('ai', '网络连接出现问题。', true);
-    }
+function getToolDisplayName(tool) {
+    if (tool === 'knowledge_base') return '🔍 知识库搜索';
+    if (tool === 'tavily_search') return '🌐 联网搜索';
+    return `🛠️ ${tool}`;
 }
-*/
 
 // ====================================================================
 // 新版本（流式输出）- 使用 SSE 接收打字机效果
@@ -437,6 +441,8 @@ async function handleSendMessage() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let fullText = '';  // 累积完整文本用于实时 Markdown 渲染
+        let renderTimeout = null;  // 防抖定时器
         const detectedTools = new Set(); // 累积记录本轮使用的工具
 
         while (true) {
@@ -463,20 +469,35 @@ async function handleSendMessage() {
                             case 'thread_id':
                                 // 保存后端返回的 thread_id
                                 currentSessionId = event.content;
+                                // 立即在左侧添加临时占位项（使用用户输入的消息作为标题）
+                                addTemporarySessionToSidebar(event.content, message);
                                 break;
 
                             case 'token':
-                                // 追加文本内容（打字机效果）
-                                textDiv.textContent += event.content;
+                                // 追加文本内容
+                                fullText += event.content;
+
+                                // 实时渲染 Markdown（每个 token 都立即渲染）
+                                if (typeof marked !== 'undefined') {
+                                    textDiv.innerHTML = marked.parse(fullText);
+                                    contentWrapper.classList.add('markdown-chat');
+                                } else {
+                                    textDiv.textContent = fullText;
+                                }
 
                                 // 如果是第一个token，且有检测到工具，立即更新为工具标记
-                                if (textDiv.textContent.length === event.content.length && detectedTools.size > 0) {
+                                if (fullText.length === event.content.length && detectedTools.size > 0) {
                                     const labels = [];
                                     if (detectedTools.has('knowledge_base')) labels.push('🔍 知识库搜索');
                                     if (detectedTools.has('tavily_search')) labels.push('🌐 联网搜索');
 
-                                    statusDiv.textContent = labels.join(' + ');
+                                    statusDiv.textContent = labels.join('\t\t');
                                     statusDiv.style.cssText = 'font-size: 12px; color: #28a745; margin-bottom: 8px; font-weight: 500;';
+                                }
+
+                                // 收到第一个 token 时，立即刷新左侧历史列表（让用户看到会话出现）
+                                if (fullText.length === event.content.length) {
+                                    renderHistoryList();
                                 }
 
                                 scrollToBottom();
@@ -489,47 +510,52 @@ async function handleSendMessage() {
                                     if (event.content.includes('联网')) detectedTools.add('tavily_search');
                                 }
 
-                                // 显示工具调用状态（只有在还没有开始输出内容时才更新状态文本，避免覆盖已生成的"已使用"标签）
-                                if (textDiv.textContent.length === 0) {
+                                // 实时刷新工具标签栏（显示所有已检测到的工具）
+                                if (detectedTools.size > 0) {
+                                    const labels = [];
+                                    // 保持固定的显示顺序
+                                    if (detectedTools.has('knowledge_base')) labels.push('🔍 知识库搜索');
+                                    if (detectedTools.has('tavily_search')) labels.push('🌐 联网搜索');
+
+                                    // 如果当前是正在搜索的临时状态且不在已检测列表中（不过上面已经添加了），可以在这里处理动画
+                                    // 简单起见，我们直接显示累积的静态标签
+
+                                    statusDiv.textContent = labels.join('\t\t');
+                                    statusDiv.style.cssText = 'font-size: 12px; color: #28a745; margin-bottom: 8px; font-weight: 500;';
+                                    statusDiv.style.display = 'block';
+                                } else {
+                                    // 如果没有任何工具，但有临时状态文本（比如"正在..."），显示它
                                     statusDiv.textContent = event.content;
                                     statusDiv.style.cssText = 'font-size: 12px; color: #666; margin-bottom: 5px; font-style: italic;';
-                                    if (!event.content) {
-                                        statusDiv.style.display = 'none';
-                                    } else {
-                                        statusDiv.style.display = 'block';
-                                    }
+                                    statusDiv.style.display = 'block';
                                 }
                                 break;
 
                             case 'done':
                                 // 流式输出完成
-                                const toolsUsed = event.tools_used || [];
+                                // 合并后端返回的 tools_used 和前端检测到的 detectedTools
+                                const backendTools = event.tools_used || [];
+                                const finalTools = [...new Set([...backendTools, ...detectedTools])];
 
                                 // 如果使用了工具，将临时状态栏改为永久显示的工具标记
-                                if (toolsUsed.length > 0) {
+                                if (finalTools.length > 0) {
                                     statusDiv.style.cssText = 'font-size: 12px; color: #28a745; margin-bottom: 8px; font-weight: 500;';
-                                    const toolLabels = toolsUsed.map(tool => {
-                                        if (tool === 'knowledge_base') return '🔍 知识库搜索';
-                                        if (tool === 'tavily_search') return '🌐 联网搜索';
-                                        return `🛠️ ${tool}`;
-                                    });
-                                    statusDiv.textContent = toolLabels.join(' + ');
+                                    // 使用提取的 helper 函数
+                                    const toolLabels = finalTools.map(getToolDisplayName);
+                                    statusDiv.textContent = toolLabels.join('\t');
                                     statusDiv.style.display = 'block';
                                     // 将工具信息保存到 DOM，方便后续使用
-                                    aiMessageDiv.dataset.toolsUsed = JSON.stringify(toolsUsed);
+                                    aiMessageDiv.dataset.toolsUsed = JSON.stringify(finalTools);
                                 } else {
                                     statusDiv.style.display = 'none';
                                 }
 
-                                // 检测并渲染 Markdown
-                                const fullText = textDiv.textContent;
-                                const hasMarkdown = /###|##|\*\*|\n-\s|\n\d+\.\s/.test(fullText);
-
-                                if (hasMarkdown && typeof marked !== 'undefined') {
-                                    // 渲染 Markdown
+                                // 最终渲染 Markdown（确保防抖结束后完整渲染）
+                                clearTimeout(renderTimeout);
+                                if (typeof marked !== 'undefined' && fullText) {
                                     textDiv.innerHTML = marked.parse(fullText);
-                                    // 添加 markdown-document 类以应用 GitHub 风格
-                                    contentWrapper.classList.add('markdown-document');
+                                    // 添加 markdown-chat 类以应用紧凑样式
+                                    contentWrapper.classList.add('markdown-chat');
                                 }
 
                                 // 刷新左侧历史列表
@@ -577,31 +603,26 @@ function addMessageToUI(type, content, shouldSave = false, toolsUsed = null) {
 
     // 内容气泡
     const messageContent = document.createElement('div');
-    // 如果是 AI 消息且包含 Markdown，添加 markdown-document 类以启用 GitHub 风格样式
+    // 如果是 AI 消息且包含 Markdown，添加 markdown-chat 类以启用紧凑样式
     const isMarkdown = typeof marked !== 'undefined' && (content.includes('#') || content.includes('*') || content.includes('-'));
     if (type === 'ai' && isMarkdown) {
-        messageContent.className = 'message-content markdown-document';
+        messageContent.className = 'message-content markdown-chat';
     } else {
         messageContent.className = 'message-content';
     }
 
     messageContent.style.boxShadow = 'none';
 
-    // 如果不是 markdown document，保留边框；markdown document 自带样式
-    if (!messageContent.classList.contains('markdown-document')) {
-        messageContent.style.border = '1px solid #e1e4e8';
-    }
+    // 保留边框样式
+    messageContent.style.border = '1px solid #e1e4e8';
 
     // 如果是 AI 消息且有工具使用记录，显示工具标记
     if (type === 'ai' && toolsUsed && toolsUsed.length > 0) {
         const toolBadge = document.createElement('div');
         toolBadge.style.cssText = 'font-size: 12px; color: #28a745; margin-bottom: 8px; font-weight: 500;';
-        const toolLabels = toolsUsed.map(tool => {
-            if (tool === 'knowledge_base') return '🔍 知识库搜索';
-            if (tool === 'tavily_search') return '🌐 联网搜索';
-            return `🛠️ ${tool}`;
-        });
-        toolBadge.textContent = toolLabels.join(' + ');
+        // 使用提取的 helper 函数
+        const toolLabels = toolsUsed.map(getToolDisplayName);
+        toolBadge.textContent = toolLabels.join('\t\t');
         messageContent.appendChild(toolBadge);
     }
 
@@ -624,6 +645,6 @@ function addMessageToUI(type, content, shouldSave = false, toolsUsed = null) {
     // shouldSave 参数已废弃，不再保存到本地存储
 }
 
-function showLoading() { loadingOverlay.classList.remove('hidden'); }
-function hideLoading() { loadingOverlay.classList.add('hidden'); }
+// 使用 api.js 中的工具函数
+// showLoading, hideLoading, scrollToBottom 等已在 api.js 中定义
 function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }

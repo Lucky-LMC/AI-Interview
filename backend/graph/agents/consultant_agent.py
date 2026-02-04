@@ -5,8 +5,6 @@
 支持对话记忆功能
 """
 from langgraph.prebuilt import create_react_agent
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-import aiosqlite
 from backend.graph.llm import openai_llm
 from backend.graph.tools.consultant_tools import consultant_tools
 
@@ -30,9 +28,9 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 该工具使用向量检索技术，能够理解用户问题的语义，找到最相关的知识点。
 
 **特别注意**：
-- 即使之前回答过类似问题，如果用户问的是**不同的公司、不同的岗位、不同的技术等不同的东西时**，必须重新调用工具
-- 不要假设，比如："阿里"和"字节"的答案是一样的，必须针对性地采用工具
-- 对话记忆是用来理解上下文的，不是用来跳过工具调用的
+- **每个新问题都必须调用工具**，即使之前回答过类似的问题
+- 不要依赖对话记忆来回答问题，必须先调用工具获取最新信息
+- 对话记忆只用来理解上下文和用户意图，不用来直接回答问题
 
 ### Step 2: 评估结果并决定下一步
 
@@ -69,38 +67,25 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - **禁止在知识库无结果时不调用联网搜索！**
 """
 
-# 创建全局 AsyncSQLite checkpointer（与面试工作流共享同一个数据库）
-# 注意：AsyncSqliteSaver 需要异步初始化，所以这里只定义路径
-_consultant_db_path = "checkpoints-sqlite/checkpoints.sqlite"
-_consultant_checkpointer = None
-_consultant_agent_with_checkpointer = None
-
-
-async def get_consultant_checkpointer():
-    """
-    获取或创建 AsyncSqliteSaver 实例（单例模式）
-    """
-    global _consultant_checkpointer
-    if _consultant_checkpointer is None:
-        # 异步创建连接
-        conn = await aiosqlite.connect(_consultant_db_path, check_same_thread=False)
-        _consultant_checkpointer = AsyncSqliteSaver(conn)
-    return _consultant_checkpointer
+# 创建全局 Agent 实例（不使用 checkpointer，每次对话都是独立的）
+_consultant_agent = None
 
 
 async def get_consultant_agent():
     """
-    获取或创建带 checkpointer 的 Agent（单例模式）
+    获取顾问 Agent 实例（无记忆版本）
     
-    这个函数确保 Agent 只创建一次，并且使用异步 checkpointer
+    ⚠️ 重要：顾问 Agent 不使用 checkpointer，每次对话都是独立的
+    这样可以避免多轮对话时的状态异常问题
+    
+    如果需要上下文，可以在前端手动传入历史消息
     """
-    global _consultant_agent_with_checkpointer
-    if _consultant_agent_with_checkpointer is None:
-        checkpointer = await get_consultant_checkpointer()
-        _consultant_agent_with_checkpointer = create_react_agent(
+    global _consultant_agent
+    if _consultant_agent is None:
+        _consultant_agent = create_react_agent(
             model=openai_llm,
             tools=consultant_tools,
-            prompt=CONSULTANT_AGENT_PROMPT,
-            checkpointer=checkpointer
+            prompt=CONSULTANT_AGENT_PROMPT
+            # 不使用 checkpointer，每次对话都是全新的
         )
-    return _consultant_agent_with_checkpointer
+    return _consultant_agent

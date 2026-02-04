@@ -65,14 +65,14 @@ def search_knowledge_base(query: str) -> str:
         
         if not results:
             print(f"[Consultant Agent - search_knowledge_base] ❌ 未找到相关内容")
-            return "无相关信息"
+            return "知识库中没有找到相关内容。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
         
         # 过滤相似度过低的结果（score 越小越相似，< 0.8 表示相关）
         relevant_results = [(doc, score) for doc, score in results if score < 0.8]
         
         if not relevant_results:
             print(f"[Consultant Agent - search_knowledge_base] ❌ 相似度不足（最佳相似度: {results[0][1]:.3f}，需要 < 0.8），触发联网搜索")
-            return "无相关信息"
+            return "知识库中没有找到相关内容。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
         
         # 合并检索结果
         matched_content = []
@@ -87,7 +87,9 @@ def search_knowledge_base(query: str) -> str:
         
     except Exception as e:
         print(f"[Consultant Agent - search_knowledge_base] ❌ 检索失败: {e}")
-        return "无相关信息"
+        import traceback
+        traceback.print_exc()
+        return "知识库检索失败。请立即使用 tavily_search 工具进行联网搜索以获取最新信息。"
 
 
 @tool("tavily_search")

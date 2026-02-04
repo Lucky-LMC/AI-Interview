@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 from typing import Optional
-from backend.graph.agents.consultant_agent import get_consultant_agent, get_consultant_checkpointer
+from backend.graph.agents.consultant_agent import get_consultant_agent
 from langchain_core.messages import HumanMessage
 from backend.models.schemas import (
     ChatRequest, 
@@ -221,14 +221,15 @@ async def chat_with_agent_stream(
     async def event_generator():
         db = SessionLocal()
         try:
-            # 一次性获取带 checkpointer 的 agent（单例）
+            # 一次性获取 Agent（无记忆版本）
             agent = await get_consultant_agent()
             
-            config = {
-                "configurable": {
-                    "thread_id": thread_id
-                }
-            }
+            # 不再使用 config，因为没有 checkpointer
+            # config = {
+            #     "configurable": {
+            #         "thread_id": thread_id
+            #     }
+            # }
             
             # 立即返回 thread_id
             yield f"data: {json.dumps({'type': 'thread_id', 'content': thread_id}, ensure_ascii=False)}\n\n"
@@ -239,14 +240,17 @@ async def chat_with_agent_stream(
             tools_used = []  # 记录本轮对话使用的工具
             event_count = 0
             
-            # 使用 astream_events 监听流式事件
+            # 使用 astream_events 监听流式事件（不传 config）
             async for event in agent.astream_events(
                 {"messages": [HumanMessage(content=request.message)]},
-                config,
                 version="v2"
             ):
                 kind = event["event"]
                 event_count += 1
+                
+                # 详细日志：打印所有事件类型（调试用）
+                if kind not in ["on_chat_model_stream"]:  # 避免 token 日志刷屏
+                    print(f"[Consultant] 事件 {event_count}: {kind}")
                 
                 # 监听 LLM 的流式输出
                 if kind == "on_chat_model_stream":
@@ -270,89 +274,78 @@ async def chat_with_agent_stream(
                 # 监听工具调用开始
                 elif kind == "on_tool_start":
                     tool_name = event["name"]
-                    # 记录工具使用
-                    if "knowledge" in tool_name.lower() and "knowledge_base" not in tools_used:
-                        tools_used.append("knowledge_base")
+                    print(f"[Consultant] 🛠️ 工具调用: {tool_name}")  # 详细日志
+                    
+                    # 记录工具使用（检查多种可能的工具名称）
+                    if "knowledge" in tool_name.lower():
+                        if "knowledge_base" not in tools_used:
+                            tools_used.append("knowledge_base")
                         status_msg = "🔍 正在搜索知识库..."
-                    elif "tavily" in tool_name.lower() and "tavily_search" not in tools_used:
-                        tools_used.append("tavily_search")
+                    elif "tavily" in tool_name.lower() or "search" in tool_name.lower():
+                        if "tavily_search" not in tools_used:
+                            tools_used.append("tavily_search")
                         status_msg = "🌐 正在联网搜索..."
                     else:
+                        # 其他未知工具，也记录下来
+                        if tool_name not in tools_used:
+                            tools_used.append(tool_name)
                         status_msg = f"🛠️ 正在使用工具: {tool_name}"
                     
                     yield f"data: {json.dumps({'type': 'status', 'content': status_msg}, ensure_ascii=False)}\n\n"
                 
-                # 监听工具调用结束（不清空status，让前端在第一个token时更新）
+                # 监听工具调用结束（清空状态，让前端准备接收内容）
                 elif kind == "on_tool_end":
-                    pass  # 保持"正在搜索..."状态，等待前端在收到第一个token时更新
+                    # 清空状态提示，准备接收 LLM 输出
+                    yield f"data: {json.dumps({'type': 'status', 'content': ''}, ensure_ascii=False)}\n\n"
             
             print(f"[Consultant] 事件循环结束，共处理 {event_count} 个事件，生成 {len(full_response)} 字符")
             
+            # 如果没有生成内容，记录日志但不重试（避免重复发送消息导致对话混乱）
+            if not full_response.strip():
+                print(f"[Consultant] ⚠️ 流式输出为空，可能是 Agent 认为无需回答或已在之前回答过")
+
             # 流式输出结束标记（同时返回工具使用信息）
             yield f"data: {json.dumps({'type': 'done', 'content': '', 'tools_used': tools_used}, ensure_ascii=False)}\n\n"
             
             print(f"[Consultant] 流式输出完成，开始保存数据库")
             
-            # 3. 从 checkpoint 获取完整消息历史并保存到数据库
+            # 3. 保存到数据库（不使用 checkpoint，直接保存当前对话）
             try:
-                checkpointer = await get_consultant_checkpointer()
-                checkpoint_tuple = await checkpointer.aget_tuple(config)
-                
-                all_messages = []
-                if checkpoint_tuple and checkpoint_tuple.checkpoint:
-                    channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
-                    all_messages = channel_values.get("messages", [])
-                
-                # 提取需要保存的消息（过滤策略：保留所有human + 每轮对话的最后一条有效ai）
+                # 构建要保存的消息
                 messages_to_save = []
-                last_ai_message = None
                 
-                for msg in all_messages:
-                    if not hasattr(msg, 'type'):
-                        continue
-                    
-                    if msg.type == 'human':
-                        # 如果之前有AI消息，先保存它
-                        if last_ai_message:
-                            messages_to_save.append(last_ai_message)
-                            last_ai_message = None
-                        
-                        # 保存用户消息
-                        if msg.content and msg.content.strip():
-                            messages_to_save.append({
-                                "role": "human",
-                                "content": msg.content
-                            })
-                    
-                    elif msg.type == 'ai':
-                        # 严格过滤AI消息
-                        if msg.content and msg.content.strip():
-                            content = msg.content.strip()
-                            # 排除单字符、纯符号或明显的 JSON 片段
-                            if len(content) > 3 and not content in ['{', '}', '}\n', '{\n']:
-                                last_ai_message = {
-                                    "role": "ai",
-                                    "content": msg.content,
-                                    "tools_used": tools_used  # 添加工具使用记录
-                                }
-                
-                # 保存最后一条AI消息
-                if last_ai_message:
-                    messages_to_save.append(last_ai_message)
-                
-                print(f"[Consultant] 准备保存 {len(messages_to_save)} 条消息，工具使用: {tools_used}")
-                
-                # 查询或创建记录
+                # 查询已有记录
                 record = db.query(ConsultantRecord).filter(
                     ConsultantRecord.thread_id == thread_id,
                     ConsultantRecord.user_name == user_name
                 ).first()
                 
+                # 如果有已有记录，保留历史消息
+                if record and record.messages:
+                    messages_to_save = record.messages.copy()
+                
+                # 添加当前对话
+                messages_to_save.append({
+                    "role": "human",
+                    "content": request.message
+                })
+                
+                if full_response.strip():
+                    messages_to_save.append({
+                        "role": "ai",
+                        "content": full_response,
+                        "tools_used": tools_used
+                    })
+                
+                print(f"[Consultant] 准备保存 {len(messages_to_save)} 条消息，工具使用: {tools_used}")
+                
+                # 查询或创建记录
                 if record:
+                    # 更新已有记录
                     record.messages = messages_to_save
                     record.updated_at = datetime.now()
                 else:
-                    # 生成标题
+                    # 生成标题（使用第一条用户消息）
                     title = "新咨询会话"
                     if messages_to_save:
                         first_user_msg = next((m for m in messages_to_save if m['role'] == 'human'), None)
