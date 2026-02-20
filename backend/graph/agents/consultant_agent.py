@@ -65,25 +65,16 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - 不要编造信息，依赖工具返回的真实内容
 - 记住对话历史，提供连贯的对话体验"""
 
-# 创建全局 Agent 实例（不使用 checkpointer，每次对话都是独立的）
-_consultant_agent = None
+
+def create_consultant_agent():
+    """创建面试顾问 Agent"""
+    agent = create_react_agent(
+        model=openai_llm,
+        tools=consultant_tools,
+        prompt=CONSULTANT_AGENT_PROMPT
+    )
+    return agent
 
 
-async def get_consultant_agent():
-    """
-    获取顾问 Agent 实例（无记忆版本）
-    
-    ⚠️ 重要：顾问 Agent 不使用 checkpointer，每次对话都是独立的
-    这样可以避免多轮对话时的状态异常问题
-    
-    如果需要上下文，可以在前端手动传入历史消息
-    """
-    global _consultant_agent
-    if _consultant_agent is None:
-        _consultant_agent = create_react_agent(
-            model=openai_llm,
-            tools=consultant_tools,
-            prompt=CONSULTANT_AGENT_PROMPT
-            # 不使用 checkpointer，每次对话都是全新的
-        )
-    return _consultant_agent
+# 创建全局 Agent 实例
+consultant_agent = create_consultant_agent()

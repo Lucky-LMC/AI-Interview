@@ -8,8 +8,6 @@ from backend.graph.state import InterviewState
 from backend.graph.agents import interviewer_agent
 
 
-
-
 def ask_question_node(state: InterviewState) -> InterviewState:
     """
     出题节点：使用面试官 Agent 智能生成问题
@@ -56,6 +54,9 @@ def ask_question_node(state: InterviewState) -> InterviewState:
 """
         
         print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")
+        
+        # 创建 Agent 实例
+        interviewer_agent = create_interviewer_agent()
         
         # 调用 Agent
         agent_input = {"messages": [HumanMessage(content=user_message)]}

@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 from typing import Optional
-from backend.graph.agents.consultant_agent import get_consultant_agent
+from backend.graph.agents.consultant_agent import consultant_agent
 from langchain_core.messages import HumanMessage, AIMessage
 from backend.models.schemas import (
     ChatRequest, 
@@ -76,8 +76,8 @@ async def chat_with_agent_stream(
     async def event_generator():
         db = SessionLocal()
         try:
-            # 获取 Agent（无记忆版本）
-            agent = await get_consultant_agent()
+            # 获取 Agent 实例
+            agent = consultant_agent
             
             # 手动记忆管理：从数据库加载最近2轮对话作为上下文
             history_messages = []
