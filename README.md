@@ -493,7 +493,7 @@ python -m backend.utils.sync_checkpoints_with_mysql
 - **分层设计**：配置层、数据层、业务层、路由层清晰分离
 - **包管理**：规范的 Python 包结构，便于维护和扩展
 - **类型安全**：使用 TypedDict 和类型注解
-- **单例模式**：LLM 实例和向量数据库复用，提高性能
+- **单例模式**：三个 Agent（Interviewer / Feedback / Consultant）均在模块级创建全局实例，服务启动时初始化一次，全程复用；LLM 实例和向量数据库同理
 - **错误处理**：完善的异常捕获和日志记录
 - **事务回滚**：操作失败时自动清理数据库、文件和 Checkpoint
 
@@ -506,10 +506,12 @@ python -m backend.utils.sync_checkpoints_with_mysql
 4. 在 `backend/graph/workflow/interview_workflow.py` 中添加到工作流
 
 ### 自定义 Agent
-1. 在 `backend/graph/agents/` 创建新 Agent
-2. 使用 `create_react_agent` 创建 Agent 实例
-3. 定义 Agent 的系统提示词
-4. 在相应节点中调用
+1. 在 `backend/graph/agents/` 创建新 Agent 文件
+2. 定义 Agent 系统提示词（`YOUR_AGENT_PROMPT`）
+3. 定义创建函数 `create_xxx_agent()`，内部调用 `create_react_agent`
+4. 在模块末尾创建全局实例：`xxx_agent = create_xxx_agent()`
+5. 在 `backend/graph/agents/__init__.py` 中导出创建函数和全局实例
+6. 在相应节点中直接 `from backend.graph.agents import xxx_agent` 导入使用
 
 ### 添加新工具
 1. 在 `backend/graph/tools/` 创建新工具文件
