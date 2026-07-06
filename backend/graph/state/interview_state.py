@@ -4,7 +4,7 @@
 定义面试过程中需要维护的所有状态信息
 使用 TypedDict 确保类型安全，便于 IDE 提示和类型检查
 """
-from typing import TypedDict, List, Dict
+from typing import Any, TypedDict, List, Dict
 
 
 class InterviewState(TypedDict):
@@ -23,11 +23,16 @@ class InterviewState(TypedDict):
     resume_path: str    # 简历 PDF 文件路径
     resume_text: str    # LLM 提取的简历关键信息（结构化摘要）
     target_position: str  # LLM 提取的目标岗位
+    resume_validation: Dict[str, Any]  # 简历结构化质量校验结果
+    resume_valid: bool  # 简历结构化信息是否通过质量门禁
     
     # ========== 面试记录 ==========
     # 存储所有轮次的问答记录
     # 每条记录包含：问题、回答
     history: List[Dict[str, str]]  # [{"question": "", "answer": ""}]
+    question_review: Dict[str, Any]  # 最新问题质量审查结果
+    question_retry_count: int  # 当前问题质量审查触发的重写次数
+    question_rewrite_instruction: str  # 问题重写要求
     
     # ========== 学习资源 ==========
     learning_resources: str  # Coach Agent 搜索到的学习资源

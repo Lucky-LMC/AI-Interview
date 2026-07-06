@@ -3,13 +3,17 @@
 工作流图层 - LangGraph 工作流编排
 用于定义面试系统的整体流程和节点间的流转逻辑
 """
-from langgraph.graph import StateGraph, END, START
 import sqlite3
+from pathlib import Path
+
+from langgraph.graph import StateGraph, END, START
 from langgraph.checkpoint.sqlite import SqliteSaver
 from backend.graph.state import InterviewState
 from backend.graph.nodes import (
     parse_resume_node,       # 解析简历节点
+    validate_resume_node,    # 简历质量门禁节点
     ask_question_node,       # 出题节点
+    review_question_node,    # 问题质量审查节点
     answer_node,             # 回答节点（中断点）
     check_finish_node,       # 检查是否结束节点
     feedback_node,           # 反馈节点（Feedback Agent）
@@ -19,7 +23,9 @@ from backend.graph.nodes import (
 # 全局 checkpointer 实例，确保所有请求共享同一个状态存储 (使用 SQLite 持久化)
 # check_same_thread=False 允许在多线程环境(FastAPI)中使用同一个连接
 # 将数据库文件存放在 checkpoints-sqlite 目录下
-_global_db_connection = sqlite3.connect("checkpoints-sqlite/checkpoints.sqlite", check_same_thread=False)
+_project_root = Path(__file__).resolve().parents[3]
+_checkpoint_db_path = _project_root / "checkpoints-sqlite" / "checkpoints.sqlite"
+_global_db_connection = sqlite3.connect(str(_checkpoint_db_path), check_same_thread=False)
 _global_checkpointer = SqliteSaver(_global_db_connection)
 
 
@@ -33,7 +39,9 @@ def create_interview_graph():
     # ========== 添加节点 ==========
     # 每个节点对应一个业务功能，接收 state 并返回更新后的 state
     workflow.add_node("parse_resume", parse_resume_node)             # 简历解析节点
+    workflow.add_node("validate_resume", validate_resume_node)        # 简历质量门禁节点
     workflow.add_node("interviewer_agent", ask_question_node)        # 面试官 Agent
+    workflow.add_node("review_question", review_question_node)        # 问题质量审查节点
     workflow.add_node("answer", answer_node)                         # 用户回答节点
     workflow.add_node("check_finish", check_finish_node)             # 检查是否完成所有轮次
     workflow.add_node("feedback_agent", feedback_node)               # 搜索学习资源节点（Feedback Agent）
@@ -44,11 +52,28 @@ def create_interview_graph():
     # START -> 简历解析节点，作为整个流程的起点
     workflow.add_edge(START, "parse_resume")
 
-    # 简历解析节点 -> 面试官 Agent
-    workflow.add_edge("parse_resume", "interviewer_agent")
+    # 简历解析节点 -> 简历质量门禁 -> 面试官 Agent
+    workflow.add_edge("parse_resume", "validate_resume")
+    workflow.add_conditional_edges(
+        "validate_resume",
+        lambda state: "valid" if state.get("resume_valid", False) else "invalid",
+        {
+            "valid": "interviewer_agent",
+            "invalid": END,
+        }
+    )
 
-    # 面试官 Agent -> 回答：出题后等待用户回答
-    workflow.add_edge("interviewer_agent", "answer")
+    # 面试官 Agent -> 问题质量审查：通过后再等待用户回答
+    workflow.add_edge("interviewer_agent", "review_question")
+
+    workflow.add_conditional_edges(
+        "review_question",
+        lambda state: "approved" if state.get("question_review", {}).get("passed", False) else "rewrite",
+        {
+            "approved": "answer",
+            "rewrite": "interviewer_agent",
+        }
+    )
     
     # 回答 -> 检查：用户回答后直接检查是否完成所有轮次（移除即时评价）
     workflow.add_edge("answer", "check_finish")

@@ -19,7 +19,16 @@ def ask_question_node(state: InterviewState) -> InterviewState:
     resume_text = state.get('resume_text', '')
     target_position = state.get('target_position', '未知岗位')
     history = state.get('history', [])
-    round_num = state.get('round', 0) + 1
+    retry_count = state.get('question_retry_count', 0)
+    rewrite_instruction = state.get('question_rewrite_instruction', '')
+    is_retry = (
+        retry_count > 0
+        and bool(history)
+        and bool(history[-1].get('question'))
+        and not history[-1].get('answer')
+    )
+    round_num = state.get('round', 0) if is_retry else state.get('round', 0) + 1
+    max_rounds = state.get('max_rounds', 3)
     
     if not resume_text:
         print(f"[ask_question_node] 警告: 没有可用的简历文本 (round={round_num})")
@@ -36,7 +45,8 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         user_message = f"""当前面试进展：
 
 ## 1. 基础信息
-- **轮次**: 第 {round_num} / 3 轮
+- **轮次**: 第 {round_num} / {max_rounds} 轮
+- **总轮数**: {max_rounds} 轮
 - **候选人岗位**: {target_position}
 
 ## 2. 候选人简历
@@ -52,12 +62,17 @@ def ask_question_node(state: InterviewState) -> InterviewState:
 
 **注意**：你是面试官，请直接向候选人提问。不要复述简历或历史记录。
 """
+
+        if is_retry and rewrite_instruction:
+            user_message += f"""
+
+## 4. 问题质量审查反馈
+上一版问题未通过质量审查，请根据以下要求重写当前轮问题，不要推进轮次：
+{rewrite_instruction}
+"""
         
         print(f"[ask_question_node] 调用面试官 Agent，轮次: {round_num}，岗位: {target_position}")
-        
-        # 创建 Agent 实例
-        interviewer_agent = create_interviewer_agent()
-        
+
         # 调用 Agent
         agent_input = {"messages": [HumanMessage(content=user_message)]}
         result = interviewer_agent.invoke(agent_input)
@@ -88,7 +103,10 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         }
         
         new_history = state.get('history', []).copy()
-        new_history.append(history_entry)
+        if is_retry and new_history:
+            new_history[-1] = history_entry
+        else:
+            new_history.append(history_entry)
         
         # 更新状态
         new_state = state.copy()
@@ -104,12 +122,15 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         fallback_question = f"请介绍一下你最擅长的技术领域，并举例说明在项目中的应用。"
         
         history_entry = {
-            "question": question,
+            "question": fallback_question,
             "answer": ""
         }
         
         new_history = state.get('history', []).copy()
-        new_history.append(history_entry)
+        if is_retry and new_history:
+            new_history[-1] = history_entry
+        else:
+            new_history.append(history_entry)
         
         # 更新状态
         new_state = state.copy()

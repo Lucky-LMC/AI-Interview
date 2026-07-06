@@ -43,6 +43,31 @@ class SubmitAnswerRequest(BaseModel):
     answer: str = Field(..., description="用户回答", min_length=1)
     user_name: Optional[str] = Field(None, description="用户名（可选，用于保存记录）")
 
+
+class ResumeValidationResult(BaseModel):
+    """简历结构化质量门禁结果"""
+    passed: bool = Field(..., description="是否通过简历结构化质量门禁")
+    score: float = Field(..., ge=0.0, le=1.0, description="简历结构化完整度分数")
+    issues: List[str] = Field(default_factory=list, description="发现的问题")
+    rewrite_instruction: str = Field("", description="失败时给后续修复或提示使用的说明")
+
+
+class QuestionReviewDimension(BaseModel):
+    """单个问题质量维度评分"""
+    name: str = Field(..., description="维度名称")
+    score: float = Field(..., ge=0.0, le=1.0, description="维度分数")
+    reason: str = Field("", description="评分理由")
+
+
+class QuestionReviewResult(BaseModel):
+    """面试问题质量审查结果"""
+    passed: bool = Field(..., description="问题是否通过质量审查")
+    score: float = Field(..., ge=0.0, le=1.0, description="综合质量分数")
+    dimensions: List[QuestionReviewDimension] = Field(default_factory=list, description="维度评分")
+    issues: List[str] = Field(default_factory=list, description="问题质量缺陷")
+    rewrite_instruction: str = Field("", description="重写问题时需要遵守的要求")
+    used_fallback: bool = Field(False, description="是否使用了预置题型兜底")
+
 # --- Responses ---
 
 class StartInterviewResponse(BaseModel):

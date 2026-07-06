@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Interview Upgrade"
+  short_description: "Align interview project code with resume claims"
+  default_prompt: "Use $ai-interview-upgrade to upgrade the AI interview project so source code, README, and resume claims stay aligned."

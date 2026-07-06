@@ -7,12 +7,14 @@
 ## ✨ 核心亮点
 
 ### 🔄 LangGraph 工作流架构
-- 采用专业的 Agent 工作流设计，实现从简历解析到报告生成的完整面试逻辑
+- 采用 8 节点 LangGraph 工作流设计，实现从简历解析、质量校验、面试提问到报告生成的完整面试逻辑
 - 支持工作流可视化，清晰展示节点间的流转关系
 - 使用 SQLite Checkpointer 实现状态持久化和断点续传
+- 设置简历结构化校验与问题质量审查两层质量门禁，问题未通过时触发重写或模板兜底
 
 ### 🤖 多 Agent 协作系统
 - **面试官 Agent**：基于简历生成针对性问题，支持多轮深入提问
+- **问题质量审查节点**：从相关性、难度梯度、重复度、清晰度 4 个维度校验问题质量
 - **反馈 Agent**：分析面试表现，联网搜索真实学习资源（Tavily API）
 - **面试顾问 Agent**：采用 RAG（检索增强生成）技术，提供专业面试咨询
 
@@ -49,7 +51,7 @@
 - **通信协议**: Server-Sent Events (SSE) 实现流式传输
 - **数据库**: 
   - MySQL 8.0+（用户数据、面试记录、顾问对话记录）
-  - SQLite + aiosqlite（LangGraph Async Checkpoint）
+  - SQLite + SqliteSaver（LangGraph Checkpoint）
 - **ORM**: SQLAlchemy 2.0+
 - **文档解析**: PyPDF2
 
@@ -70,12 +72,14 @@
 
 **1. 主面试工作流（左图）**：
 1. **START** → **parse_resume**（简历解析节点）：解析 PDF 格式简历，提取关键信息
-2. **parse_resume** → **interviewer_agent**（面试官 Agent）：基于简历生成针对性问题
-3. **interviewer_agent** → **answer**（用户回答节点）：等待用户输入答案（中断点）
-4. **answer** → **check_finish**（检查完成节点）：判断是否完成所有轮次
-5. **check_finish** → **interviewer_agent**（继续）或 **feedback_agent**（结束）：条件路由
-6. **feedback_agent** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
-7. **generate_report** → **END**：流程结束
+2. **parse_resume** → **validate_resume**（简历质量门禁）：校验目标岗位、核心技能、项目经历和面试关注点是否完整
+3. **validate_resume** → **interviewer_agent**（面试官 Agent）：基于简历生成针对性问题
+4. **interviewer_agent** → **review_question**（问题质量审查节点）：从相关性、难度、重复度、清晰度 4 个维度审查问题
+5. **review_question** → **answer**（通过）或 **interviewer_agent**（重写）：问题未通过时最多重写一次，再失败则使用预置题型兜底
+6. **answer** → **check_finish**（检查完成节点）：等待用户输入答案（中断点）并判断是否完成所有轮次
+7. **check_finish** → **interviewer_agent**（继续）或 **feedback_agent**（结束）：条件路由
+8. **feedback_agent** → **generate_report**（报告生成节点）：搜索学习资源并生成最终报告
+9. **generate_report** → **END**：流程结束
 
 **2. 智能顾问工作流（右图）**：
 - 专门处理用户的咨询问题（如"面试流程是什么"、"如何准备自我介绍"、"阿里巴巴面试考什么"）
@@ -104,7 +108,9 @@ Interview/
 │   │   │   └── __init__.py
 │   │   ├── nodes/            # 工作流节点
 │   │   │   ├── parse_resume_node.py      # 简历解析节点
+│   │   │   ├── validate_resume_node.py   # 简历质量门禁节点
 │   │   │   ├── ask_question_node.py      # 出题节点
+│   │   │   ├── review_question_node.py   # 问题质量审查节点
 │   │   │   ├── answer_node.py            # 回答节点（中断点）
 │   │   │   ├── check_finish_node.py      # 检查完成节点
 │   │   │   ├── feedback_node.py          # 搜索资源节点
@@ -133,7 +139,7 @@ Interview/
 │   │   ├── user.py                 # 用户模型
 │   │   ├── interview_record.py     # 面试记录模型
 │   │   ├── consultant_record.py    # 顾问对话记录模型
-│   │   ├── schemas.py              # API 数据模型
+│   │   ├── schemas.py              # API 数据模型与质量门禁结构化输出模型
 │   │   └── __init__.py
 │   ├── routes/              # API 路由
 │   │   ├── interview_routes.py    # 面试相关接口
@@ -408,6 +414,7 @@ python -m backend.utils.sync_checkpoints_with_mysql
   - 项目经历亮点
   - 面试关注点
 - 输出结构化 Markdown 格式
+- 使用 `validate_resume` 节点校验目标岗位、核心技能、项目经历亮点和面试关注点是否完整，并将校验结果写入工作流状态
 
 ### 2. 动态问题生成（Interviewer Agent）
 - 基于简历内容生成针对性问题
@@ -415,6 +422,8 @@ python -m backend.utils.sync_checkpoints_with_mysql
 - 多轮面试，逐步深入
 - 避免重复提问
 - 支持自定义面试轮数
+- 使用 `review_question` 节点对问题进行 4 维度质量审查：简历相关性、轮次难度、重复风险、表达清晰度
+- 低质量问题会触发一次重写；重写后仍不达标时，系统使用预置题型模板兜底，避免用户看到不可用问题
 
 ### 3. RAG 智能顾问（Consultant Agent）
 - **私有知识库**：
@@ -461,8 +470,9 @@ python -m backend.utils.sync_checkpoints_with_mysql
 
 ### LangGraph 工作流设计
 - **状态管理**：使用 TypedDict 定义面试状态，类型安全
-- **节点编排**：清晰的节点职责划分，易于维护和扩展
-- **条件路由**：根据面试进度动态决策下一步
+- **节点编排**：主面试流程包含 `parse_resume`、`validate_resume`、`interviewer_agent`、`review_question`、`answer`、`check_finish`、`feedback_agent`、`generate_report` 8 个核心节点
+- **质量门禁**：通过 Pydantic 模型记录简历校验和问题审查结果，便于调试、恢复和面试过程复盘
+- **条件路由**：根据面试进度和问题审查结果动态决策下一步
 - **中断机制**：在用户回答前中断，实现交互式对话
 - **Checkpointer**：使用 SqliteSaver 实现状态持久化和断点续传
 

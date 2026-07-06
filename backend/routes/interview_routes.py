@@ -88,7 +88,13 @@ async def start_interview(
             "resume_path": str(pdf_file_path),
             "resume_text": "",
             "target_position": "",
+            "resume_validation": {},
+            "resume_valid": False,
             "history": [],
+            "question_review": {},
+            "question_retry_count": 0,
+            "question_rewrite_instruction": "",
+            "learning_resources": "",
             "report": "",
             "is_finished": False
         }
@@ -99,6 +105,12 @@ async def start_interview(
         result = workflow.invoke(initial_state, config)
         
         # 5. 获取结果
+        if not result.get('resume_valid', False):
+            validation = result.get('resume_validation', {})
+            issues = validation.get('issues', []) if isinstance(validation, dict) else []
+            issue_text = "；".join(issues) if issues else "简历结构化信息不完整"
+            raise HTTPException(status_code=422, detail=f"简历校验未通过: {issue_text}")
+
         history = result.get('history', [])
         question = history[-1].get('question', '') if history else ''
         resume_text = result.get('resume_text', '')
@@ -131,6 +143,8 @@ async def start_interview(
             resume_file_url=resume_file_url
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         # 回滚所有操作
         import traceback
@@ -273,26 +287,14 @@ async def submit_answer(
         if is_finished:
             response.report = report
         else:
-            state_info = workflow.get_state(config)
-            if state_info.next and "interviewer_agent" in state_info.next:
-                continue_result = workflow.invoke(None, config)
-                continue_history = continue_result.get('history', [])
-                response.question = continue_history[-1].get('question', '') if continue_history else ''
-                # 再次更新数据库以保存新生成的问题
-                try:
-                     if record:
-                        record.history = continue_history
-                        from datetime import datetime
-                        record.updated_at = datetime.now()
-                        db.commit()
-                except:
-                    pass
-            else:
-                result_history = result.get('history', [])
-                response.question = result_history[-1].get('question', '') if result_history else ''
+            # workflow.invoke 会继续运行到下一个 answer 中断点。
+            # 插入 review_question 后，中间可能经历重写循环，这里只读取最终可展示的问题。
+            response.question = history[-1].get('question', '') if history else ''
             
         return response
     
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()

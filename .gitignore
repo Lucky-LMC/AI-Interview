@@ -11,3 +11,4 @@ uploads/
 Git操作指南.md
 checkpoints-sqlite/
 backend/graph/rag/chroma_db/
+docs/
