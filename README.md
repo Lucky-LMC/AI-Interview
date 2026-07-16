@@ -24,7 +24,6 @@
 ```mermaid
 flowchart TB
     web["Web 前端"] --> interview_api["面试 API"]
-    web --> consultant_api["顾问 SSE API"]
 
     subgraph interview_flow["主面试流程 · LangGraph StateGraph"]
         direction TB
@@ -32,67 +31,50 @@ flowchart TB
         start --> parse["① 解析简历<br/>parse_resume"]
         parse --> validate{"② 简历有效性校验<br/>validate_resume"}
         validate -- 无效 --> invalid_end([END])
-        validate -- 有效 --> interviewer[["③ Interviewer Agent<br/>ask_question_node → create_agent"]]
+        validate -- 有效 --> interviewer[["③ Interviewer Agent 子图<br/>ask_question_node → create_agent"]]
         interviewer --> review{"④ 问题质量门禁<br/>review_question"}
         review -- 重写一次 --> interviewer
         review -- 通过 --> answer["⑤ 等待候选人回答<br/>answer · interrupt"]
         answer --> finish{"⑥ 是否完成全部轮次<br/>check_finish"}
         finish -- 继续下一题 --> interviewer
-        finish -- 完成 --> feedback[["⑦ Feedback Agent<br/>feedback_node → create_agent"]]
+        finish -- 完成 --> feedback[["⑦ Feedback Agent 子图<br/>feedback_node → create_agent"]]
         feedback --> report["⑧ 生成面试报告<br/>generate_report"]
         report --> done([END])
-    end
-
-    subgraph consultant_flow["面试顾问独立流程 · SSE"]
-        direction TB
-        consultant_api --> consultant[["Consultant Agent<br/>create_agent"]]
-        consultant --> events["token / tool_start / tool_end<br/>degraded / done 事件"]
-        events --> browser["前端实时展示"]
-        consultant -. RAG 检索 .-> knowledge["search_knowledge_base<br/>Chroma 知识库"]
-        consultant -. 低置信度时由模型选择 .-> web_search["tavily_search<br/>联网补充"]
-        knowledge -. ToolMessage .-> consultant
-        web_search -. ToolMessage .-> consultant
     end
 
     classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
     classDef process fill:#eff6ff,color:#1e3a8a,stroke:#60a5fa,stroke-width:1.5px;
     classDef decision fill:#fffbeb,color:#78350f,stroke:#f59e0b,stroke-width:1.5px;
     classDef agent fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
-    classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
     classDef human fill:#ecfdf5,color:#064e3b,stroke:#34d399,stroke-width:1.5px;
 
     class start,invalid_end,done terminal;
-    class web,interview_api,consultant_api,parse,report,events,browser process;
+    class web,interview_api,parse,report process;
     class validate,review,finish decision;
-    class interviewer,feedback,consultant agent;
-    class knowledge,web_search tool;
+    class interviewer,feedback agent;
     class answer human;
 
     style interview_flow fill:#fdfcff,stroke:#7c3aed,stroke-width:2px;
-    style consultant_flow fill:#f8fbff,stroke:#2563eb,stroke-width:2px;
 ```
 
-主面试流程由外层 `StateGraph` 管理确定性路由、人工中断、Checkpoint 和错误恢复；三个紫色 Agent 节点内部都调用官方 `create_agent`，详细运行结构如下。
+主面试流程由外层 `StateGraph` 管理确定性路由、人工中断、Checkpoint 和错误恢复。两个紫色节点是工作流中的 Agent 子图边界，分别由 `ask_question_node`、`feedback_node` 调用官方 `create_agent` 编译图。顾问 Agent 属于独立的 SSE 对话入口，不放入主面试总图；它的内部图单独展示。
 
-### create_agent 内部完整流程
+### Interviewer Agent 内部图
 
 ```mermaid
 flowchart TB
-    subgraph agent_graph["create_agent 编译子图"]
+    subgraph interviewer_graph["Interviewer Agent · create_agent 编译子图"]
         direction TB
-        agent_start([START]) --> before_model["ModelCallLimitMiddleware.before_model<br/>下一次模型调用前检查预算"]
-        before_model -- 预算可用 --> model["model<br/>ModelRetryMiddleware · wrap_model_call"]
-        before_model -. 模型预算耗尽 .-> agent_end([END])
-
-        model --> per_tool_limit["ToolCallLimitMiddleware[tool_name].after_model<br/>每个工具各一个限额节点"]
-        per_tool_limit --> global_tool_limit["ToolCallLimitMiddleware.after_model<br/>检查 Agent 全局工具预算"]
-        global_tool_limit --> after_model["ModelCallLimitMiddleware.after_model<br/>累计模型调用次数"]
-
-        after_model -- tool_calls --> tools["tools<br/>ToolRetryMiddleware · wrap_tool_call"]
-        tools -- ToolMessage --> before_model
-        after_model -- 最终回答或结构化输出 --> agent_end
-        after_model -- 格式重试 / 继续推理 --> before_model
-        tools -. 结构化响应工具<br/>仅 Interviewer / Feedback .-> agent_end
+        start_i([START]) --> before_i["ModelCallLimitMiddleware.before_model<br/>模型预算检查"]
+        before_i -- 可继续 --> agent_i["agent / model<br/>ModelRetryMiddleware · wrap_model_call"]
+        before_i -. 达到模型上限 .-> end_i([END])
+        agent_i --> tool_i["ToolCallLimitMiddleware[search_interview_questions].after_model<br/>单工具预算"]
+        tool_i --> global_i["ToolCallLimitMiddleware.after_model<br/>全局工具预算"]
+        global_i --> after_i["ModelCallLimitMiddleware.after_model<br/>记录模型调用"]
+        after_i -- 业务工具调用 --> tools_i["tools<br/>ToolRetryMiddleware · wrap_tool_call"]
+        tools_i -- ToolMessage --> before_i
+        after_i -- 结构化 InterviewQuestion --> end_i([END])
+        after_i -- 继续推理 / 格式重试 --> before_i
     end
 
     classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
@@ -100,15 +82,88 @@ flowchart TB
     classDef agentCore fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
     classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
 
-    class agent_start,agent_end terminal;
-    class before_model,per_tool_limit,global_tool_limit,after_model middleware;
-    class model agentCore;
-    class tools tool;
+    class start_i,end_i terminal;
+    class before_i,tool_i,global_i,after_i middleware;
+    class agent_i agentCore;
+    class tools_i tool;
 
-    style agent_graph fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
+    style interviewer_graph fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
 ```
 
-橙色方框是会进入编译图的 node-style Middleware hook。`ModelRetryMiddleware` 与 `ToolRetryMiddleware` 是 wrap-style hook，所以标注在 `model` 和 `tools` 内部，而不是画成伪节点。工具调用超限时，当前 `continue` 策略会阻止超额调用并注入错误 `ToolMessage`，让模型在剩余预算内继续决策；模型调用达到上限时直接结束 Agent。
+Interviewer 的业务工具由 `tools` 节点统一表示，实际注册的是 `search_interview_questions`；模型生成 `InterviewQuestion` 结构化结果后结束 Agent。橙色方框是会进入编译图的 node-style Middleware hook；`ModelRetryMiddleware` 和 `ToolRetryMiddleware` 是 wrap-style hook，所以只标注在 Agent/Tools 节点内部。
+
+### Feedback Agent 内部图
+
+```mermaid
+flowchart TB
+    subgraph feedback_graph["Feedback Agent · create_agent 编译子图"]
+        direction TB
+        start_f([START]) --> before_f["ModelCallLimitMiddleware.before_model<br/>模型预算检查"]
+        before_f -- 可继续 --> agent_f["agent / model<br/>ModelRetryMiddleware · wrap_model_call"]
+        before_f -. 达到模型上限 .-> end_f([END])
+        agent_f --> tool_f["ToolCallLimitMiddleware[search_learning_resources].after_model<br/>单工具预算"]
+        tool_f --> global_f["ToolCallLimitMiddleware.after_model<br/>全局工具预算"]
+        global_f --> after_f["ModelCallLimitMiddleware.after_model<br/>记录模型调用"]
+        after_f -- 业务工具调用 --> tools_f["tools<br/>ToolRetryMiddleware · wrap_tool_call"]
+        tools_f -- ToolMessage --> before_f
+        after_f -- 结构化 FeedbackRecommendations --> end_f([END])
+        after_f -- 继续推理 / 格式重试 --> before_f
+    end
+
+    classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
+    classDef middleware fill:#fff7ed,color:#7c2d12,stroke:#fb923c,stroke-width:1.5px;
+    classDef agentCore fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
+
+    class start_f,end_f terminal;
+    class before_f,tool_f,global_f,after_f middleware;
+    class agent_f agentCore;
+    class tools_f tool;
+
+    style feedback_graph fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
+```
+
+Feedback 的业务工具由 `tools` 节点统一表示，实际注册的是 `search_learning_resources`；模型生成 `FeedbackRecommendations` 结构化结果后结束 Agent。它与 Interviewer 共用相同的 ReAct 形态，但模型预算为 6 次、工具预算为 3 次。
+
+### Consultant Agent 内部图
+
+```mermaid
+flowchart TB
+    subgraph consultant_graph["Consultant Agent · create_agent 编译子图"]
+        direction TB
+        start_c([START]) --> before_c["ModelCallLimitMiddleware.before_model<br/>模型预算检查"]
+        before_c -- 可继续 --> agent_c["agent / model<br/>ModelRetryMiddleware · wrap_model_call"]
+        before_c -. 达到模型上限 .-> end_c([END])
+        agent_c --> tavily_limit_c["ToolCallLimitMiddleware[tavily_search].after_model<br/>单工具预算"]
+        tavily_limit_c --> kb_limit_c["ToolCallLimitMiddleware[search_knowledge_base].after_model<br/>单工具预算"]
+        kb_limit_c --> global_c["ToolCallLimitMiddleware.after_model<br/>全局工具预算"]
+        global_c --> after_c["ModelCallLimitMiddleware.after_model<br/>记录模型调用"]
+        after_c -- 业务工具调用 --> tools_c["tools<br/>ToolRetryMiddleware · wrap_tool_call"]
+        tools_c -- ToolMessage --> before_c
+        after_c -- 最终文本回答 --> end_c([END])
+        after_c -- 继续推理 --> before_c
+    end
+
+    sse["/api/customer-service/chat · SSE"] --> start_c
+    agent_c -. 运行期间流式事件 .-> events["token / tool_start / tool_end<br/>degraded 事件"]
+    end_c --> done_c["done 事件"]
+
+    classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
+    classDef middleware fill:#fff7ed,color:#7c2d12,stroke:#fb923c,stroke-width:1.5px;
+    classDef agentCore fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
+    classDef process fill:#eff6ff,color:#1e3a8a,stroke:#60a5fa,stroke-width:1.5px;
+
+    class start_c,end_c terminal;
+    class before_c,kb_limit_c,tavily_limit_c,global_c,after_c middleware;
+    class agent_c agentCore;
+    class tools_c tool;
+    class sse,events,done_c process;
+
+    style consultant_graph fill:#f8fbff,stroke:#2563eb,stroke-width:2px;
+```
+
+Consultant 由独立 SSE 路由驱动，`tools` 节点统一表示 `search_knowledge_base` 和 `tavily_search`；工具调用完成后回到 Agent 继续判断，最终文本回答通过 SSE 输出。它没有结构化响应分支，模型预算为 5 次、全局工具预算为 2 次、每个工具最多 1 次。
 
 | Agent | 主要工具 | 模型调用上限 | 工具调用上限 |
 |---|---|---:|---:|
@@ -116,7 +171,7 @@ flowchart TB
 | Feedback | `search_learning_resources` | 6 | 搜索 3 次 |
 | Consultant | `search_knowledge_base`、`tavily_search` | 5 | 总计 2 次；每个工具 1 次 |
 
-中间件使用 `ModelRetryMiddleware`、`ToolRetryMiddleware`、`ModelCallLimitMiddleware` 和 `ToolCallLimitMiddleware`。只有分类为瞬时错误的异常允许重试；配置缺失和输入校验错误不会盲目重试。
+中间件使用 `ModelRetryMiddleware`、`ToolRetryMiddleware`、`ModelCallLimitMiddleware` 和 `ToolCallLimitMiddleware`。其中 `before_model`、`after_model` 是编译图中的节点式 hook；`wrap_model_call`、`wrap_tool_call` 只包裹调用，不会额外生成节点。只有分类为瞬时错误的异常允许重试；配置缺失和输入校验错误不会盲目重试。
 
 ### 问题质量门禁
 
