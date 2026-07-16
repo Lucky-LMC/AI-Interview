@@ -37,12 +37,12 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 
 ### Step 2: 评估结果并决定下一步
 
-**如果工具返回提示需要联网搜索**：
+**如果 `search_knowledge_base` 返回的 JSON 中 `fallback_required` 为 `true`**：
 - **立即、必须、强制调用** `tavily_search` 工具
 - 不要直接回答，不要说"知识库没有"
 - 必须先搜索，再基于搜索结果回答
 
-**如果 `search_knowledge_base` 返回了内容**：
+**如果 `fallback_required` 为 `false` 且 documents 有内容**：
 - 仔细阅读返回的内容
 - **如果内容完整、详细、能够充分回答用户的问题** → 直接基于该内容生成专业回复
 - **如果内容不够完整、不够详细、或明显无法回答用户问题** → 调用 `tavily_search` 补充最新信息

@@ -10,6 +10,7 @@ from backend.graph.llm import openai_embeddings
 from backend.config import TAVILY_API_KEY
 from backend.graph.runtime import SourceRef, ToolResult
 from backend.graph.runtime.tool_runtime import timed_tool_call
+from backend.graph.rag.service import RagService
 
 # Chroma 数据库路径
 CHROMA_DB_PATH = Path(__file__).parent.parent / "rag" / "chroma_db"
@@ -50,34 +51,12 @@ def search_knowledge_base(query: str) -> str:
     """
     def _retrieve() -> ToolResult:
         vectorstore = get_vectorstore()
-        results = vectorstore.similarity_search_with_score(query, k=2)
-        if not results:
-            return ToolResult.success(
-                data={"query": query, "chunks": [], "fallback_required": True},
-                degraded=True,
-            )
-
-        threshold = 0.6
-        relevant_results = [(doc, score) for doc, score in results if score < threshold]
-        if not relevant_results:
-            return ToolResult.success(
-                data={"query": query, "chunks": [], "fallback_required": True},
-                degraded=True,
-            )
-
-        chunks = [doc.page_content for doc, _ in relevant_results]
-        sources = [
-            SourceRef(
-                title=doc.metadata.get("section", "面试知识库"),
-                document_id=doc.metadata.get("document_id", "interview-kb"),
-                section=doc.metadata.get("section"),
-                score=score,
-            )
-            for doc, score in relevant_results
-        ]
+        rag_result = RagService(vectorstore).retrieve(query, k=4)
+        sources = [document.source for document in rag_result.documents]
         return ToolResult.success(
-            data={"query": query, "chunks": chunks, "fallback_required": False},
+            data=rag_result.model_dump(mode="json"),
             sources=sources,
+            degraded=rag_result.fallback_required,
         )
 
     return timed_tool_call("knowledge_base", _retrieve).model_dump_json()

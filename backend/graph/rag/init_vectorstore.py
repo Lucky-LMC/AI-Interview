@@ -10,16 +10,18 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_chroma import Chroma
 from backend.graph.llm import openai_embeddings
 from backend.config import EMBEDDING_MODEL
+from backend.graph.rag.manifest import annotate_chunks, build_manifest, write_manifest
 
 # 知识库文件路径
 KNOWLEDGE_BASE_PATH = Path(__file__).parent / "interview_knowledge_base.md"
 # Chroma 数据库存储路径
 CHROMA_DB_PATH = Path(__file__).parent / "chroma_db"
+MANIFEST_PATH = CHROMA_DB_PATH / "manifest.json"
+SPLITTER_VERSION = "markdown-headers-v1"
 
 
 def init_vectorstore():
@@ -56,6 +58,13 @@ def init_vectorstore():
     )
     
     docs = markdown_splitter.split_text(markdown_text)
+    manifest = build_manifest(
+        markdown_text,
+        EMBEDDING_MODEL,
+        SPLITTER_VERSION,
+        chunk_count=len(docs),
+    )
+    docs = annotate_chunks(docs, manifest)
     print(f"  ✓ 切分为 {len(docs)} 个文档块")
     
     # 3. 使用全局 Embedding 模型
@@ -71,12 +80,13 @@ def init_vectorstore():
         try:
             client = Chroma(
                 persist_directory=str(CHROMA_DB_PATH),
-                embedding_function=openai_embeddings
+                embedding_function=openai_embeddings,
+                collection_name="interview_knowledge",
             )
             # 删除旧的 collection
             client.delete_collection()
             print("  ✓ 旧 collection 已删除")
-        except:
+        except Exception:
             # 如果删除失败（可能不存在），忽略错误
             pass
     
@@ -87,6 +97,8 @@ def init_vectorstore():
         persist_directory=str(CHROMA_DB_PATH),
         collection_name="interview_knowledge"
     )
+    CHROMA_DB_PATH.mkdir(parents=True, exist_ok=True)
+    write_manifest(MANIFEST_PATH, manifest)
     
     print(f"  ✓ 向量数据库创建成功，共 {len(docs)} 个文档")
     
