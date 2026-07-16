@@ -4,9 +4,11 @@
 采用"优先私有知识库 + 兜底联网搜索"的双工具策略
 支持对话记忆功能
 """
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from backend.graph.llm import openai_llm
 from backend.graph.tools.consultant_tools import consultant_tools
+from backend.graph.runtime.middleware import build_agent_middleware
+from backend.graph.runtime.policies import AgentPolicy
 
 
 # Agent 系统提示词
@@ -66,12 +68,14 @@ CONSULTANT_AGENT_PROMPT = """你是一位专业的面试顾问。你的职责是
 - 记住对话历史，提供连贯的对话体验"""
 
 
-def create_consultant_agent():
+def create_consultant_agent(model=None):
     """创建面试顾问 Agent"""
-    agent = create_react_agent(
-        model=openai_llm,
+    agent = create_agent(
+        model=model or openai_llm,
         tools=consultant_tools,
-        prompt=CONSULTANT_AGENT_PROMPT
+        system_prompt=CONSULTANT_AGENT_PROMPT,
+        middleware=build_agent_middleware(AgentPolicy.consultant()),
+        name="consultant_agent",
     )
     return agent
 

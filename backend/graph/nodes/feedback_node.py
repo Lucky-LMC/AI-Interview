@@ -6,6 +6,7 @@
 from langchain_core.messages import HumanMessage
 from backend.graph.state import InterviewState
 from backend.graph.agents import feedback_agent
+from backend.models.schemas import FeedbackRecommendations
 
 
 
@@ -49,8 +50,27 @@ def feedback_node(state: InterviewState) -> InterviewState:
         # 调用 Agent（输入简短，任务明确）
         result = feedback_agent.invoke({"messages": [HumanMessage(content=user_message)]})
         
-        # 提取搜索结果
-        search_results = result["messages"][-1].content
+        structured_response = result.get("structured_response")
+        if isinstance(structured_response, FeedbackRecommendations):
+            lines = [structured_response.summary]
+            for item in structured_response.resources:
+                title = item.title or item.topic
+                if item.url:
+                    lines.append(f"- [{title}]({item.url})：{item.reason}")
+                else:
+                    lines.append(f"- {title}：{item.reason}")
+            search_results = "\n\n".join(lines)
+        elif isinstance(structured_response, dict):
+            parsed = FeedbackRecommendations.model_validate(structured_response)
+            lines = [parsed.summary]
+            lines.extend(
+                f"- [{item.title}]({item.url})：{item.reason}"
+                if item.url else f"- {item.title}：{item.reason}"
+                for item in parsed.resources
+            )
+            search_results = "\n\n".join(lines)
+        else:
+            search_results = result["messages"][-1].content
         
         print(f"[search_resources_node] 搜索完成，结果长度: {len(search_results)}")
         
@@ -59,8 +79,8 @@ def feedback_node(state: InterviewState) -> InterviewState:
         new_state['learning_resources'] = search_results
         return new_state
             
-    except Exception as e:
-        print(f"[search_resources_node] 搜索失败: {e}")
+    except Exception:
+        print("[search_resources_node] 搜索失败，已使用安全降级结果")
         new_state = state.copy()
-        new_state['learning_resources'] = f"搜索失败: {str(e)}"
+        new_state['learning_resources'] = "学习资源服务暂时不可用，请稍后重试。"
         return new_state

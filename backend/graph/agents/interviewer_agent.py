@@ -4,10 +4,12 @@
 使用 ReAct 模式，可以调用工具进行出题
 支持流式输出（打字机效果）
 """
-from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import SystemMessage
+from langchain.agents import create_agent
 from backend.graph.llm import openai_llm
 from backend.graph.tools import interviewer_tools
+from backend.graph.runtime.middleware import build_agent_middleware
+from backend.graph.runtime.policies import AgentPolicy
+from backend.models.schemas import InterviewQuestion
 
 
 # Agent 系统提示词
@@ -41,17 +43,20 @@ topic 建议：
 """
 
 
-def create_interviewer_agent():
+def create_interviewer_agent(model=None):
     """
     创建面试官 Agent
     
-    使用 LangGraph 的 create_react_agent 创建一个可以调用工具的 Agent
+    使用 LangChain create_agent 创建一个可以调用工具的 Agent
     返回的是一个 CompiledGraph，可以直接作为子图使用
     """
-    agent = create_react_agent(
-        model=openai_llm,
+    agent = create_agent(
+        model=model or openai_llm,
         tools=interviewer_tools,
-        prompt=INTERVIEWER_AGENT_PROMPT
+        system_prompt=INTERVIEWER_AGENT_PROMPT,
+        middleware=build_agent_middleware(AgentPolicy.interviewer()),
+        response_format=InterviewQuestion,
+        name="interviewer_agent",
     )
     return agent
 

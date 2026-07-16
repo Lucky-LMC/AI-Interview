@@ -77,18 +77,23 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         agent_input = {"messages": [HumanMessage(content=user_message)]}
         result = interviewer_agent.invoke(agent_input)
         
-        # 从 Agent 输出中提取最终问题
-        # Agent 的输出格式是 {"messages": [...]}
+        # 优先读取 create_agent 的结构化输出，兼容旧消息输出作为降级路径。
+        structured_response = result.get("structured_response")
+        if structured_response is not None:
+            if hasattr(structured_response, "question"):
+                question = structured_response.question.strip()
+            else:
+                question = str(structured_response.get("question", "")).strip()
+        else:
+            question = ""
+
         messages = result.get("messages", [])
-        question = ""
-        
-        # 获取最后一条 AI 消息作为问题
-        for msg in reversed(messages):
-            if hasattr(msg, 'content') and msg.content:
-                # 跳过工具调用消息
-                if not hasattr(msg, 'tool_calls') or not msg.tool_calls:
-                    question = msg.content.strip()
-                    break
+        if not question:
+            for msg in reversed(messages):
+                if hasattr(msg, 'content') and msg.content:
+                    if not hasattr(msg, 'tool_calls') or not msg.tool_calls:
+                        question = msg.content.strip()
+                        break
         
         if not question:
             # 如果没有获取到问题，使用备用逻辑
