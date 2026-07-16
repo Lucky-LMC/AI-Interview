@@ -6,6 +6,8 @@
 """
 from typing import Any, TypedDict, List, Dict
 
+from backend.graph.runtime.contracts import WorkflowRuntime
+
 
 class InterviewState(TypedDict):
     """
@@ -43,3 +45,6 @@ class InterviewState(TypedDict):
 
     # ========== 面试控制 ==========
     is_finished: bool   # 标识面试是否已完成所有轮次
+
+    # ========== 运行控制（与业务状态分离） ==========
+    runtime: WorkflowRuntime

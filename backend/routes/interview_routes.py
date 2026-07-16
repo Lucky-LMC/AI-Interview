@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from typing import Optional
 from backend.graph.state import InterviewState
+from backend.graph.runtime import WorkflowRuntime
 from backend.models.schemas import (
     StartInterviewResponse,
     SubmitAnswerRequest,
@@ -96,7 +97,11 @@ async def start_interview(
             "question_rewrite_instruction": "",
             "learning_resources": "",
             "report": "",
-            "is_finished": False
+            "is_finished": False,
+            "runtime": WorkflowRuntime.new(
+                run_id=thread_id,
+                workflow_version="2.0",
+            ),
         }
         
         # 4. 启动工作流执行
