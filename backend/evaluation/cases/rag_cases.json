@@ -1,0 +1,18 @@
+[
+  {
+    "id": "rag-star-source",
+    "query": "STAR 法则",
+    "confidence": "high",
+    "fallback_required": false,
+    "actual_document_ids": ["kb-star"],
+    "expected_document_ids": ["kb-star"]
+  },
+  {
+    "id": "rag-low-confidence-fallback",
+    "query": "最新招聘政策",
+    "confidence": "low",
+    "fallback_required": true,
+    "actual_document_ids": [],
+    "expected_document_ids": []
+  }
+]
