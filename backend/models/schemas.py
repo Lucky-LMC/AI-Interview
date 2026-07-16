@@ -67,6 +67,7 @@ class QuestionReviewResult(BaseModel):
     issues: List[str] = Field(default_factory=list, description="问题质量缺陷")
     rewrite_instruction: str = Field("", description="重写问题时需要遵守的要求")
     used_fallback: bool = Field(False, description="是否使用了预置题型兜底")
+    decision_source: str = Field("rules", description="rules、judge 或 fallback")
 
 
 class InterviewQuestion(BaseModel):
