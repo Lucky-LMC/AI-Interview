@@ -23,7 +23,7 @@ from backend.models.schemas import (
     InterviewRecordDetailResponse,
     InterviewStatusResponse
 )
-from backend.graph.workflow import create_interview_graph
+from backend.graph.workflow import interview_graph_session
 from backend.config import SessionLocal
 from backend.models import InterviewRecord
 
@@ -105,9 +105,12 @@ async def start_interview(
         }
         
         # 4. 启动工作流执行
-        workflow = create_interview_graph()
-        config = {"configurable": {"thread_id": thread_id}}
-        result = workflow.invoke(initial_state, config)
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": 30,
+        }
+        async with interview_graph_session() as workflow:
+            result = await workflow.ainvoke(initial_state, config)
         
         # 5. 获取结果
         if not result.get('resume_valid', False):
@@ -218,27 +221,29 @@ async def submit_answer(
     处理用户回答，评分，并决定下一步
     """
     try:
-        workflow = create_interview_graph()
-        config = {"configurable": {"thread_id": request.thread_id}}
-        
-        # 1. 获取当前状态
-        current_state = workflow.get_state(config)
+        config = {
+            "configurable": {"thread_id": request.thread_id},
+            "recursion_limit": 30,
+        }
+
+        async with interview_graph_session() as workflow:
+            # 1. 获取当前状态
+            current_state = await workflow.aget_state(config)
         
         # 关键检查：如果状态为空，说明该 thread_id 在数据库中找不到（可能是重启前的内存数据丢失了）
-        if not current_state.values:
-             raise HTTPException(
-                 status_code=410,
-                 detail="会话已过期（服务端重启导致旧内存数据丢失），请点击左侧'开启新对话'重新开始。"
-             )
+            if not current_state.values:
+                 raise HTTPException(
+                     status_code=410,
+                     detail="会话不存在或已过期，请重新开始面试。"
+                 )
 
-        if current_state.values:
             history = current_state.values.get('history', [])
             if history:
                 history[-1]['answer'] = request.answer
-                workflow.update_state(config, {"history": history})
-        
-        # 2. 恢复工作流执行
-        result = workflow.invoke(None, config)
+                await workflow.aupdate_state(config, {"history": history})
+
+            # 2. 恢复工作流执行
+            result = await workflow.ainvoke(None, config)
         
         # 3. 获取最新状态数据
         is_finished = result.get('is_finished', False)

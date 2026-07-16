@@ -61,4 +61,10 @@ def classify_exception(exc: Exception) -> ErrorCategory:
         return ErrorCategory.TRANSIENT
     if isinstance(exc, _VALIDATION_BUILTINS):
         return ErrorCategory.VALIDATION
+    error_name = type(exc).__name__.lower()
+    if any(marker in error_name for marker in ("timeout", "connection", "ratelimit")):
+        return ErrorCategory.TRANSIENT
+    status_code = getattr(exc, "status_code", None)
+    if status_code == 429 or isinstance(status_code, int) and status_code >= 500:
+        return ErrorCategory.TRANSIENT
     return ErrorCategory.PERMANENT

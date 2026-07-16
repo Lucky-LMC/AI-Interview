@@ -19,10 +19,11 @@ def test_graph_contains_expected_nodes(compiled_graph):
     }
 
 
-def test_invalid_resume_ends_before_question(compiled_graph, invalid_interview_state):
+@pytest.mark.asyncio
+async def test_invalid_resume_ends_before_question(compiled_graph, invalid_interview_state):
     config = {"configurable": {"thread_id": f"test-{uuid.uuid4()}"}}
 
-    result = compiled_graph.invoke(invalid_interview_state, config)
+    result = await compiled_graph.ainvoke(invalid_interview_state, config)
 
     assert result["resume_valid"] is False
     assert result["history"] == []

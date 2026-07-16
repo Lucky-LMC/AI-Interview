@@ -3,6 +3,7 @@
 简历解析节点
 使用 PDF 解析提取原始文本，然后用 LLM 提取关键信息和目标岗位
 """
+import asyncio
 import os
 from backend.graph.state import InterviewState
 from backend.utils.pdf_parser import parse_pdf
@@ -60,7 +61,7 @@ RESUME_EXTRACT_PROMPT = """你是一个专业的简历分析助手。请从以�
 """
 
 
-def parse_resume_node(state: InterviewState) -> InterviewState:
+async def parse_resume_node(state: InterviewState) -> InterviewState:
     """
     简历解析节点：
     1. 解析 PDF 获取原始文本
@@ -84,7 +85,7 @@ def parse_resume_node(state: InterviewState) -> InterviewState:
         # ========== 步骤1：解析 PDF 获取原始文本 ==========
         print(f"[parse_resume_node] 开始解析PDF: {resume_path}")
         
-        resume_raw_text = parse_pdf(resume_path)
+        resume_raw_text = await asyncio.to_thread(parse_pdf, resume_path)
         
         # 检查解析结果
         if not resume_raw_text or resume_raw_text.startswith("错误") or resume_raw_text.startswith("警告"):
@@ -100,7 +101,7 @@ def parse_resume_node(state: InterviewState) -> InterviewState:
         prompt = RESUME_EXTRACT_PROMPT.format(resume_raw_text=resume_raw_text)
         
         # 调用 LLM
-        response = openai_llm.invoke(prompt)
+        response = await openai_llm.ainvoke(prompt)
         extracted_info = response.content
         
         print(f"[parse_resume_node] LLM提取完成，信息长度: {len(extracted_info)}")

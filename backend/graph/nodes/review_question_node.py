@@ -1,12 +1,12 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """面试问题质量审查节点。"""
 
-from backend.graph.quality.question_quality import evaluate_question, fallback_question
+from backend.graph.quality.question_quality import async_evaluate_question, fallback_question
 from backend.graph.state import InterviewState
 from backend.models.schemas import QuestionReviewDimension, QuestionReviewResult
 
 
-def review_question_node(state: InterviewState) -> InterviewState:
+async def review_question_node(state: InterviewState) -> InterviewState:
     """Apply rules, an optional semantic judge, one rewrite, then fallback."""
 
     history = state.get("history", [])
@@ -36,7 +36,7 @@ def review_question_node(state: InterviewState) -> InterviewState:
         return new_state
 
     question = history[-1].get("question", "")
-    result = evaluate_question(question, state)
+    result = await async_evaluate_question(question, state)
     retry_count = state.get("question_retry_count", 0)
     new_state = state.copy()
 

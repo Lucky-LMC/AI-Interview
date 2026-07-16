@@ -119,6 +119,29 @@ def _default_judge(
     return result
 
 
+async def _default_async_judge(
+    question: str,
+    state: dict[str, Any],
+    rules: RuleQualityResult,
+) -> QuestionReviewResult:
+    judge = openai_llm.bind(temperature=0).with_structured_output(QuestionReviewResult)
+    prompt = f"""你是面试问题质量审核器，只评审问题，不回答问题。
+
+候选岗位：{state.get('target_position', '未知岗位')}
+当前轮次：{state.get('round', 1)}
+简历摘要：
+{state.get('resume_text', '')}
+
+待审核问题：{question}
+规则初评分：{rules.score:.2f}
+
+判断问题是否具体引用简历证据、技术正确、难度适合、清晰且不重复。
+不合格时给出可执行的 rewrite_instruction。"""
+    result = await judge.ainvoke(prompt)
+    result.decision_source = "judge"
+    return result
+
+
 def evaluate_question(
     question: str,
     state: dict[str, Any],
@@ -160,6 +183,31 @@ def evaluate_question(
     if result is None:
         raise ValueError("question judge returned no result")
     result.decision_source = "judge"
+    if not result.passed and not result.rewrite_instruction:
+        result.rewrite_instruction = _rewrite_instruction(result.issues, state)
+    return result
+
+
+async def async_evaluate_question(
+    question: str,
+    state: dict[str, Any],
+) -> QuestionReviewResult:
+    """Async production path so LangGraph can enforce judge timeouts."""
+
+    rules = score_question_rules(question, state)
+    if rules.route != "judge":
+        return evaluate_question(question, state, judge=lambda *_: None)
+    try:
+        result = await _default_async_judge(question, state, rules)
+    except Exception:
+        return QuestionReviewResult(
+            passed=False,
+            score=rules.score,
+            dimensions=rules.dimensions,
+            issues=["语义审核暂时不可用，按保守策略重写"],
+            rewrite_instruction=_rewrite_instruction(rules.issues, state),
+            decision_source="judge_fallback",
+        )
     if not result.passed and not result.rewrite_instruction:
         result.rewrite_instruction = _rewrite_instruction(result.issues, state)
     return result

@@ -25,6 +25,8 @@ for _key, _value in _TEST_ENV.items():
 
 @pytest.fixture
 def invalid_interview_state() -> dict:
+    from backend.graph.runtime.contracts import WorkflowRuntime
+
     return {
         "round": 0,
         "max_rounds": 3,
@@ -40,6 +42,7 @@ def invalid_interview_state() -> dict:
         "learning_resources": "",
         "report": "",
         "is_finished": False,
+        "runtime": WorkflowRuntime.new(run_id="invalid-test", workflow_version="2.0"),
     }
 
 

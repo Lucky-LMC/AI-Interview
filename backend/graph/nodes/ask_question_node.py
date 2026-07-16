@@ -6,9 +6,10 @@
 from langchain_core.messages import HumanMessage
 from backend.graph.state import InterviewState
 from backend.graph.agents import interviewer_agent
+from backend.graph.runtime.errors import ErrorCategory, classify_exception
 
 
-def ask_question_node(state: InterviewState) -> InterviewState:
+async def ask_question_node(state: InterviewState) -> InterviewState:
     """
     出题节点：使用面试官 Agent 智能生成问题
     
@@ -75,7 +76,7 @@ def ask_question_node(state: InterviewState) -> InterviewState:
 
         # 调用 Agent
         agent_input = {"messages": [HumanMessage(content=user_message)]}
-        result = interviewer_agent.invoke(agent_input)
+        result = await interviewer_agent.ainvoke(agent_input)
         
         # 优先读取 create_agent 的结构化输出，兼容旧消息输出作为降级路径。
         structured_response = result.get("structured_response")
@@ -120,6 +121,8 @@ def ask_question_node(state: InterviewState) -> InterviewState:
         return new_state
             
     except Exception as e:
+        if classify_exception(e) is ErrorCategory.TRANSIENT:
+            raise
         import traceback
         print(f"[ask_question_node] Agent 调用失败: {e}")
         print(traceback.format_exc())

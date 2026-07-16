@@ -7,10 +7,11 @@ from langchain_core.messages import HumanMessage
 from backend.graph.state import InterviewState
 from backend.graph.agents import feedback_agent
 from backend.models.schemas import FeedbackRecommendations
+from backend.graph.runtime.errors import ErrorCategory, classify_exception
 
 
 
-def feedback_node(state: InterviewState) -> InterviewState:
+async def feedback_node(state: InterviewState) -> InterviewState:
     """
     搜索学习资源节点：
     1. 分析面试记录，提取候选人的主要不足
@@ -48,7 +49,7 @@ def feedback_node(state: InterviewState) -> InterviewState:
         print("[search_resources_node] 正在调用 Feedback Agent 搜索学习资源...")
         
         # 调用 Agent（输入简短，任务明确）
-        result = feedback_agent.invoke({"messages": [HumanMessage(content=user_message)]})
+        result = await feedback_agent.ainvoke({"messages": [HumanMessage(content=user_message)]})
         
         structured_response = result.get("structured_response")
         if isinstance(structured_response, FeedbackRecommendations):
@@ -79,7 +80,9 @@ def feedback_node(state: InterviewState) -> InterviewState:
         new_state['learning_resources'] = search_results
         return new_state
             
-    except Exception:
+    except Exception as exc:
+        if classify_exception(exc) is ErrorCategory.TRANSIENT:
+            raise
         print("[search_resources_node] 搜索失败，已使用安全降级结果")
         new_state = state.copy()
         new_state['learning_resources'] = "学习资源服务暂时不可用，请稍后重试。"
