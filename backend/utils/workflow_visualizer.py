@@ -45,7 +45,7 @@ def _graph_to_dot(
     graph,
     *,
     root_agent_name: str | None = None,
-    collapse_middleware: bool = True,
+    collapse_middleware: bool = False,
 ) -> str:
     """Convert the official Graph to a readable architecture projection."""
 
@@ -54,7 +54,7 @@ def _graph_to_dot(
         for edge in graph.edges
         for node_id in (edge.source, edge.target)
     }
-    connected_nodes = {
+    connected_nodes = dict(graph.nodes) if not collapse_middleware else {
         node_id: node
         for node_id, node in graph.nodes.items()
         if node_id in connected_ids
@@ -111,6 +111,14 @@ def _graph_to_dot(
                         elif next_edge.target in middleware_ids:
                             stack.append((next_edge.target, label))
         render_edges = list(dict.fromkeys(projected_edges))
+        render_edges = [
+            edge
+            for edge in render_edges
+            if not (
+                visible_nodes[edge[0]].name == "tools"
+                and visible_nodes[edge[1]].name == "__end__"
+            )
+        ]
     else:
         render_edges = [
             (edge.source, edge.target, edge.data, edge.conditional)
@@ -121,7 +129,9 @@ def _graph_to_dot(
     groups: dict[str, list[str]] = defaultdict(list)
     root_nodes: list[str] = []
     for node_id in visible_nodes:
-        if ":" in node_id:
+        if visible_nodes[node_id].name.startswith("__error_handler__"):
+            groups["registered_error_handlers"].append(node_id)
+        elif ":" in node_id:
             group_name, _ = node_id.split(":", 1)
             groups[group_name].append(node_id)
         else:
@@ -133,9 +143,42 @@ def _graph_to_dot(
             group_name = node_id.split(":", 1)[0] if ":" in node_id else "__root__"
             middleware_groups[group_name].append(node_id)
 
+    projected_adjacency = defaultdict(list)
+    for source_id, target_id, _edge_data, _is_conditional in render_edges:
+        projected_adjacency[source_id].append(target_id)
+
+    roots = [
+        node_id
+        for node_id, node in visible_nodes.items()
+        if node.name == "__start__" and ":" not in node_id
+    ]
+    roots.extend(node_id for node_id in visible_nodes if node_id not in roots)
+    parent: dict[str, str | None] = {}
+
+    def visit(node_id: str, parent_id: str | None) -> None:
+        if node_id in parent:
+            return
+        parent[node_id] = parent_id
+        for target_id in projected_adjacency[node_id]:
+            visit(target_id, node_id)
+
+    for root_id in roots:
+        visit(root_id, None)
+
+    def is_ancestor(ancestor_id: str, node_id: str) -> bool:
+        current_id = parent.get(node_id)
+        while current_id is not None:
+            if current_id == ancestor_id:
+                return True
+            current_id = parent.get(current_id)
+        return False
+
+    def edge_is_back_edge(source_id: str, target_id: str) -> bool:
+        return is_ancestor(target_id, source_id)
+
     lines = [
         "digraph architecture {",
-        '  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.55", compound=true];',
+        '  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.5", ranksep="0.75", compound=true, newrank=true, splines=ortho, ordering="out", concentrate=false];',
         '  node [shape=box, style="rounded,filled", fillcolor="#f5f3ff", color="#8b5cf6", fontname="Microsoft YaHei", fontsize=10];',
         '  edge [color="#4b5563", fontname="Microsoft YaHei", fontsize=9, arrowsize=0.7];',
     ]
@@ -144,7 +187,10 @@ def _graph_to_dot(
         node = visible_nodes[node_id]
         label = _dot_escape(_display_name(node.name))
         shape = "oval" if node.name in {"__start__", "__end__"} else "box"
-        lines.append(f'{indent}{node_refs[node_id]} [label="{label}", shape={shape}];')
+        lines.append(
+            f'{indent}{node_refs[node_id]} [label="{label}", shape={shape}]; '
+            "// official-node"
+        )
 
     def add_middleware_summary(group_name: str, indent: str) -> str | None:
         middleware_node_ids = middleware_groups.get(group_name, [])
@@ -187,6 +233,12 @@ def _graph_to_dot(
         lines.append('    color="#7c3aed"; penwidth=1.5; style="rounded";')
         for node_id in node_ids:
             add_node(node_id, "    ")
+        if group_name == "registered_error_handlers":
+            for source_id, target_id in zip(node_ids, node_ids[1:]):
+                lines.append(
+                    f'    {node_refs[source_id]} -> {node_refs[target_id]} '
+                    '[style="invis", weight=20]; // layout-only'
+                )
         group_middleware_ref = add_middleware_summary(group_name, "    ")
         lines.append("  }")
         if group_middleware_ref:
@@ -208,26 +260,41 @@ def _graph_to_dot(
     for source_id, target_id, edge_data, is_conditional in render_edges:
         attributes = []
         if edge_data is not None:
-            attributes.append(f'label="{_dot_escape(edge_data)}"')
+            attributes.append(f'xlabel="{_dot_escape(edge_data)}"')
         if is_conditional:
             attributes.append('style="dashed"')
+        if edge_is_back_edge(source_id, target_id):
+            attributes.extend([
+                'constraint="false"',
+                'color="#64748b"',
+            ])
         attribute_text = f" [{', '.join(attributes)}]" if attributes else ""
         lines.append(
-            f"  {node_refs[source_id]} -> {node_refs[target_id]}{attribute_text};"
+            f"  {node_refs[source_id]} -> {node_refs[target_id]}{attribute_text}; "
+            "// official-edge"
         )
 
     lines.append("}")
     return "\n".join(lines)
 
 
-def _render_with_graphviz(graph, *, root_agent_name: str | None = None) -> PILImage.Image:
+def _render_with_graphviz(
+    graph,
+    *,
+    root_agent_name: str | None = None,
+    collapse_middleware: bool = False,
+) -> PILImage.Image:
     dot_command = shutil.which("dot")
     if not dot_command:
         raise RuntimeError("未找到 Graphviz dot，请先安装 Graphviz 并加入 PATH")
 
     completed = subprocess.run(
         [dot_command, "-Tpng", "-Gdpi=120"],
-        input=_graph_to_dot(graph, root_agent_name=root_agent_name).encode("utf-8"),
+        input=_graph_to_dot(
+            graph,
+            root_agent_name=root_agent_name,
+            collapse_middleware=collapse_middleware,
+        ).encode("utf-8"),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
@@ -253,7 +320,7 @@ def generate_combined_graph(show_window: bool = False) -> Path:
             "name": "面试工作流",
             "graph": create_interview_graph().get_graph(xray=True),
             "root_agent_name": None,
-            "title": "AI智能面试工作流程\n(create_agent 子图 / Middleware 折叠)",
+            "title": "AI智能面试工作流程\n(LangGraph xray 自动加载)",
         },
         {
             "name": "顾问 Agent",
@@ -270,6 +337,7 @@ def generate_combined_graph(show_window: bool = False) -> Path:
             _render_with_graphviz(
                 spec["graph"],
                 root_agent_name=spec["root_agent_name"],
+                collapse_middleware=False,
             )
         )
 
@@ -303,7 +371,9 @@ def generate_combined_graph(show_window: bool = False) -> Path:
         )
         current_x += image.width + padding
 
-    output_path = project_root / "system_architecture_graph.png"
+    artifact_dir = project_root / ".artifacts"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    output_path = artifact_dir / "langgraph_xray.png"
     plt.tight_layout()
     plt.savefig(output_path, dpi=100, bbox_inches="tight", facecolor="white")
     print(f"系统架构图已保存到: {output_path}")

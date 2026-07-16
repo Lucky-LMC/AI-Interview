@@ -21,30 +21,62 @@
 
 ### 外层工作流与内层 Agent
 
-```text
-START
-  │
-  ▼
-parse_resume ──► validate_resume ──无效──► END
-                         │有效
-                         ▼
-                interviewer_agent ◄──────┐
-                         │                │一次重写
-                         ▼                │
-                  review_question ────────┘
-                         │通过
-                         ▼
-                    answer (interrupt)
-                         │提交回答
-                         ▼
-                   check_finish
-                     │       │
-                   继续      完成
-                     │       ▼
-                     └── feedback_agent ──► generate_report ──► END
+```mermaid
+flowchart TB
+    start([START]) --> parse["① 解析简历<br/>parse_resume"]
+    parse --> validate{"② 简历有效性校验<br/>validate_resume"}
+
+    validate -- 无效 --> invalid_end([END])
+    validate -- 有效 --> interviewer[["③ 面试官 Agent<br/>interviewer_agent"]]
+
+    interviewer --> review{"④ 问题质量门禁<br/>review_question"}
+    review -- 重写一次 --> interviewer
+    review -- 通过 --> answer["⑤ 等待候选人回答<br/>answer · interrupt"]
+
+    answer --> finish{"⑥ 是否完成全部轮次<br/>check_finish"}
+    finish -- 继续下一题 --> interviewer
+    finish -- 完成 --> feedback[["⑦ 反馈 Agent<br/>feedback_agent"]]
+
+    feedback --> report["⑧ 生成面试报告<br/>generate_report"]
+    report --> done([END])
+
+    classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
+    classDef process fill:#eff6ff,color:#1e3a8a,stroke:#60a5fa,stroke-width:1.5px;
+    classDef decision fill:#fffbeb,color:#78350f,stroke:#f59e0b,stroke-width:1.5px;
+    classDef agent fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef human fill:#ecfdf5,color:#064e3b,stroke:#34d399,stroke-width:1.5px;
+
+    class start,invalid_end,done terminal;
+    class parse,report process;
+    class validate,review,finish decision;
+    class interviewer,feedback agent;
+    class answer human;
 ```
 
 外层 `StateGraph` 负责顺序、条件路由、人工中断、状态持久化和错误恢复；内部三个 Agent 统一使用官方 `create_agent`，不维护自定义 ReAct 循环：
+
+```mermaid
+flowchart TB
+    subgraph create_agent["三个 Agent 统一使用的 create_agent 运行循环"]
+        direction TB
+        agent_start([START]) --> model["模型推理<br/>model"]
+        model -- tool_calls --> tools["执行工具<br/>tools"]
+        tools -- ToolMessage --> model
+        model -- 最终回答或结构化输出 --> agent_end([END])
+    end
+
+    classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
+    classDef modelNode fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef toolNode fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
+
+    class agent_start,agent_end terminal;
+    class model modelNode;
+    class tools toolNode;
+
+    style create_agent fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
+```
+
+上图用于解释稳定的架构语义。需要核对 LangGraph 编译后的全部节点、条件边和 Middleware hook 时，可运行 `python backend/utils/workflow_visualizer.py`，完整 `xray=True` 调试图会生成到 `.artifacts/langgraph_xray.png`，不作为 README 展示图。
 
 | Agent | 主要工具 | 模型调用上限 | 工具调用上限 |
 |---|---|---:|---:|

@@ -1,3 +1,5 @@
+import pytest
+
 from backend.graph.agents.consultant_agent import consultant_agent
 from backend.graph.workflow import create_interview_graph
 from backend.utils.workflow_visualizer import _graph_to_dot
@@ -6,7 +8,10 @@ from backend.utils.workflow_visualizer import _graph_to_dot
 def test_workflow_visualizer_expands_real_create_agent_subgraphs():
     compiled_graph = create_interview_graph()
 
-    dot = _graph_to_dot(compiled_graph.get_graph(xray=True))
+    dot = _graph_to_dot(
+        compiled_graph.get_graph(xray=True),
+        collapse_middleware=True,
+    )
 
     assert "interviewer_agent / create_agent" in dot
     assert "feedback_agent / create_agent" in dot
@@ -22,6 +27,7 @@ def test_consultant_visualizer_uses_real_compiled_agent_graph():
     dot = _graph_to_dot(
         consultant_agent.get_graph(xray=True),
         root_agent_name="consultant_agent",
+        collapse_middleware=True,
     )
 
     assert "consultant_agent / create_agent" in dot
@@ -37,3 +43,24 @@ def test_debug_projection_can_keep_raw_middleware_hooks():
     )
 
     assert "ModelCallLimitMiddleware.before_model" in dot
+
+
+@pytest.mark.parametrize(
+    "graph_factory",
+    [
+        lambda: create_interview_graph().get_graph(xray=True),
+        lambda: consultant_agent.get_graph(xray=True),
+    ],
+    ids=["interview-workflow", "consultant-agent"],
+)
+def test_default_projection_keeps_every_official_graph_node(graph_factory):
+    graph = graph_factory()
+    dot = _graph_to_dot(graph)
+
+    rendered_node_count = dot.count("// official-node")
+    rendered_edge_count = dot.count("// official-edge")
+
+    assert rendered_node_count == len(graph.nodes)
+    assert rendered_edge_count == len(graph.edges)
+    assert 'label="START"' in dot
+    assert 'label="END"' in dot
