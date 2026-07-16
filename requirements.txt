@@ -28,10 +28,6 @@ pymysql>=1.1.0
 PyPDF2>=3.0.0
 
 
-# Visualization
-matplotlib>=3.8.0
-pillow>=10.0.0
-
 # Configuration
 python-dotenv>=1.0.0
 

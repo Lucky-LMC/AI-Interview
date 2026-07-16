@@ -19,64 +19,96 @@
 
 ## 架构设计
 
-### 外层工作流与内层 Agent
+### 系统完整流程
 
 ```mermaid
 flowchart TB
-    start([START]) --> parse["① 解析简历<br/>parse_resume"]
-    parse --> validate{"② 简历有效性校验<br/>validate_resume"}
+    web["Web 前端"] --> interview_api["面试 API"]
+    web --> consultant_api["顾问 SSE API"]
 
-    validate -- 无效 --> invalid_end([END])
-    validate -- 有效 --> interviewer[["③ 面试官 Agent<br/>interviewer_agent"]]
+    subgraph interview_flow["主面试流程 · LangGraph StateGraph"]
+        direction TB
+        interview_api --> start([START])
+        start --> parse["① 解析简历<br/>parse_resume"]
+        parse --> validate{"② 简历有效性校验<br/>validate_resume"}
+        validate -- 无效 --> invalid_end([END])
+        validate -- 有效 --> interviewer[["③ Interviewer Agent<br/>ask_question_node → create_agent"]]
+        interviewer --> review{"④ 问题质量门禁<br/>review_question"}
+        review -- 重写一次 --> interviewer
+        review -- 通过 --> answer["⑤ 等待候选人回答<br/>answer · interrupt"]
+        answer --> finish{"⑥ 是否完成全部轮次<br/>check_finish"}
+        finish -- 继续下一题 --> interviewer
+        finish -- 完成 --> feedback[["⑦ Feedback Agent<br/>feedback_node → create_agent"]]
+        feedback --> report["⑧ 生成面试报告<br/>generate_report"]
+        report --> done([END])
+    end
 
-    interviewer --> review{"④ 问题质量门禁<br/>review_question"}
-    review -- 重写一次 --> interviewer
-    review -- 通过 --> answer["⑤ 等待候选人回答<br/>answer · interrupt"]
-
-    answer --> finish{"⑥ 是否完成全部轮次<br/>check_finish"}
-    finish -- 继续下一题 --> interviewer
-    finish -- 完成 --> feedback[["⑦ 反馈 Agent<br/>feedback_agent"]]
-
-    feedback --> report["⑧ 生成面试报告<br/>generate_report"]
-    report --> done([END])
+    subgraph consultant_flow["面试顾问独立流程 · SSE"]
+        direction TB
+        consultant_api --> consultant[["Consultant Agent<br/>create_agent"]]
+        consultant --> events["token / tool_start / tool_end<br/>degraded / done 事件"]
+        events --> browser["前端实时展示"]
+        consultant -. RAG 检索 .-> knowledge["search_knowledge_base<br/>Chroma 知识库"]
+        consultant -. 低置信度时由模型选择 .-> web_search["tavily_search<br/>联网补充"]
+        knowledge -. ToolMessage .-> consultant
+        web_search -. ToolMessage .-> consultant
+    end
 
     classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
     classDef process fill:#eff6ff,color:#1e3a8a,stroke:#60a5fa,stroke-width:1.5px;
     classDef decision fill:#fffbeb,color:#78350f,stroke:#f59e0b,stroke-width:1.5px;
     classDef agent fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
     classDef human fill:#ecfdf5,color:#064e3b,stroke:#34d399,stroke-width:1.5px;
 
     class start,invalid_end,done terminal;
-    class parse,report process;
+    class web,interview_api,consultant_api,parse,report,events,browser process;
     class validate,review,finish decision;
-    class interviewer,feedback agent;
+    class interviewer,feedback,consultant agent;
+    class knowledge,web_search tool;
     class answer human;
+
+    style interview_flow fill:#fdfcff,stroke:#7c3aed,stroke-width:2px;
+    style consultant_flow fill:#f8fbff,stroke:#2563eb,stroke-width:2px;
 ```
 
-外层 `StateGraph` 负责顺序、条件路由、人工中断、状态持久化和错误恢复；内部三个 Agent 统一使用官方 `create_agent`，不维护自定义 ReAct 循环：
+主面试流程由外层 `StateGraph` 管理确定性路由、人工中断、Checkpoint 和错误恢复；三个紫色 Agent 节点内部都调用官方 `create_agent`，详细运行结构如下。
+
+### create_agent 内部完整流程
 
 ```mermaid
 flowchart TB
-    subgraph create_agent["三个 Agent 统一使用的 create_agent 运行循环"]
+    subgraph agent_graph["create_agent 编译子图"]
         direction TB
-        agent_start([START]) --> model["模型推理<br/>model"]
-        model -- tool_calls --> tools["执行工具<br/>tools"]
-        tools -- ToolMessage --> model
-        model -- 最终回答或结构化输出 --> agent_end([END])
+        agent_start([START]) --> before_model["ModelCallLimitMiddleware.before_model<br/>下一次模型调用前检查预算"]
+        before_model -- 预算可用 --> model["model<br/>ModelRetryMiddleware · wrap_model_call"]
+        before_model -. 模型预算耗尽 .-> agent_end([END])
+
+        model --> per_tool_limit["ToolCallLimitMiddleware[tool_name].after_model<br/>每个工具各一个限额节点"]
+        per_tool_limit --> global_tool_limit["ToolCallLimitMiddleware.after_model<br/>检查 Agent 全局工具预算"]
+        global_tool_limit --> after_model["ModelCallLimitMiddleware.after_model<br/>累计模型调用次数"]
+
+        after_model -- tool_calls --> tools["tools<br/>ToolRetryMiddleware · wrap_tool_call"]
+        tools -- ToolMessage --> before_model
+        after_model -- 最终回答或结构化输出 --> agent_end
+        after_model -- 格式重试 / 继续推理 --> before_model
+        tools -. 结构化响应工具<br/>仅 Interviewer / Feedback .-> agent_end
     end
 
     classDef terminal fill:#172554,color:#ffffff,stroke:#172554,stroke-width:2px;
-    classDef modelNode fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
-    classDef toolNode fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
+    classDef middleware fill:#fff7ed,color:#7c2d12,stroke:#fb923c,stroke-width:1.5px;
+    classDef agentCore fill:#f5f3ff,color:#4c1d95,stroke:#8b5cf6,stroke-width:2px;
+    classDef tool fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
 
     class agent_start,agent_end terminal;
-    class model modelNode;
-    class tools toolNode;
+    class before_model,per_tool_limit,global_tool_limit,after_model middleware;
+    class model agentCore;
+    class tools tool;
 
-    style create_agent fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
+    style agent_graph fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px;
 ```
 
-上图用于解释稳定的架构语义。需要核对 LangGraph 编译后的全部节点、条件边和 Middleware hook 时，可运行 `python backend/utils/workflow_visualizer.py`，完整 `xray=True` 调试图会生成到 `.artifacts/langgraph_xray.png`，不作为 README 展示图。
+橙色方框是会进入编译图的 node-style Middleware hook。`ModelRetryMiddleware` 与 `ToolRetryMiddleware` 是 wrap-style hook，所以标注在 `model` 和 `tools` 内部，而不是画成伪节点。工具调用超限时，当前 `continue` 策略会阻止超额调用并注入错误 `ToolMessage`，让模型在剩余预算内继续决策；模型调用达到上限时直接结束 Agent。
 
 | Agent | 主要工具 | 模型调用上限 | 工具调用上限 |
 |---|---|---:|---:|
