@@ -189,7 +189,7 @@ async def start_interview(
             except Exception as db_e:
                 print(f"[start_interview] 回滚数据库失败: {db_e}")
         
-        raise HTTPException(status_code=500, detail=f"开始面试失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="开始面试失败，请稍后重试")
 
 
 @router.get("/resume/{thread_id}")
@@ -305,10 +305,10 @@ async def submit_answer(
     
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"提交回答失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="提交回答失败，请稍后重试")
 
 
 @router.get("/records", response_model=InterviewRecordListResponse)

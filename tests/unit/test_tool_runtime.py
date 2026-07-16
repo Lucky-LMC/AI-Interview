@@ -1,4 +1,5 @@
 from backend.graph.runtime.tool_runtime import timed_tool_call
+import pytest
 
 
 def test_timeout_is_retryable():
@@ -38,3 +39,12 @@ def test_success_records_latency_and_data():
     assert result.ok is True
     assert result.data == {"items": ["STAR"]}
     assert result.latency_ms >= 0
+
+
+def test_transient_error_can_propagate_to_retry_middleware():
+    with pytest.raises(TimeoutError):
+        timed_tool_call(
+            "search",
+            lambda: (_ for _ in ()).throw(TimeoutError("private detail")),
+            propagate_transient=True,
+        )

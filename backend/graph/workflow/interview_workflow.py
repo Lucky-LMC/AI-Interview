@@ -1,13 +1,11 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """LangGraph orchestration with retries, async timeouts, and recovery."""
 
-import sqlite3
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
@@ -30,9 +28,6 @@ from backend.graph.state import InterviewState
 _project_root = Path(__file__).resolve().parents[3]
 _checkpoint_db_path = _project_root / "checkpoints-sqlite" / "checkpoints.sqlite"
 _checkpoint_db_path.parent.mkdir(parents=True, exist_ok=True)
-_global_db_connection = sqlite3.connect(str(_checkpoint_db_path), check_same_thread=False)
-_global_checkpointer = SqliteSaver(_global_db_connection)
-
 NODE_TIMEOUTS = {
     "parse_resume": 45.0,
     "interviewer_agent": 60.0,
@@ -115,7 +110,7 @@ def create_interview_graph(
     workflow.add_edge("generate_report", END)
 
     return workflow.compile(
-        checkpointer=checkpointer if checkpointer is not None else _global_checkpointer,
+        checkpointer=checkpointer,
         interrupt_before=["answer"],
         name="interview_workflow_v2",
     )

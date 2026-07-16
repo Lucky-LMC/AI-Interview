@@ -47,9 +47,8 @@ def invalid_interview_state() -> dict:
 
 
 @pytest.fixture
-def compiled_graph(monkeypatch):
+def compiled_graph():
     from langgraph.checkpoint.memory import InMemorySaver
     from backend.graph.workflow import interview_workflow
 
-    monkeypatch.setattr(interview_workflow, "_global_checkpointer", InMemorySaver())
-    return interview_workflow.create_interview_graph()
+    return interview_workflow.create_interview_graph(checkpointer=InMemorySaver())

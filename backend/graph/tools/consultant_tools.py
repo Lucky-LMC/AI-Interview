@@ -59,7 +59,11 @@ def search_knowledge_base(query: str) -> str:
             degraded=rag_result.fallback_required,
         )
 
-    return timed_tool_call("knowledge_base", _retrieve).model_dump_json()
+    return timed_tool_call(
+        "knowledge_base",
+        _retrieve,
+        propagate_transient=True,
+    ).model_dump_json()
 
 
 @tool("tavily_search")
@@ -96,6 +100,7 @@ def tavily_search(query: str) -> str:
         "tavily",
         _search,
         missing_config=None if TAVILY_API_KEY else "TAVILY_API_KEY",
+        propagate_transient=True,
     ).model_dump_json()
 
 

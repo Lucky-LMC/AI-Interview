@@ -31,6 +31,7 @@ def timed_tool_call(
     call: Callable[[], Any],
     *,
     missing_config: str | None = None,
+    propagate_transient: bool = False,
 ) -> ToolResult:
     """Execute a tool operation and normalize failures without leaking details."""
 
@@ -45,6 +46,8 @@ def timed_tool_call(
         return ToolResult.success(data=data, latency_ms=_elapsed_ms(started))
     except Exception as exc:
         category = classify_exception(exc)
+        if propagate_transient and category is ErrorCategory.TRANSIENT:
+            raise
         return ToolResult.failure(
             error_code=error_code_for(name, exc),
             retryable=category is ErrorCategory.TRANSIENT,

@@ -74,6 +74,7 @@ def search_interview_questions(topic: str) -> str:
         "interview_search",
         _search,
         missing_config=None if config.TAVILY_API_KEY else "TAVILY_API_KEY",
+        propagate_transient=True,
     )
     return result.model_dump_json()
 
