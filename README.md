@@ -24,10 +24,9 @@
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 22, "padding": 5}, "themeVariables": {"fontSize": "12px"}}}%%
 flowchart TB
-    web["Web 前端"] --> interview_api["面试 API"]
-
     subgraph interview_flow["主面试流程 · LangGraph StateGraph"]
         direction TB
+        web["Web 前端"] --> interview_api["面试 API"]
         interview_api --> start([START])
         start --> parse["① 解析简历<br/>parse_resume"]
         parse --> validate{"简历有效性<br/>validate_resume"}
@@ -135,7 +134,8 @@ Feedback 的业务工具由 `tools` 节点统一表示，实际注册的是 `sea
 flowchart TB
     subgraph consultant_graph["Consultant Agent · create_agent 编译子图"]
         direction TB
-        start_c([START]) --> before_c["ModelCallLimit<br/>before_model · 预算"]
+        sse["/api/customer-service/chat · SSE"] --> start_c([START])
+        start_c --> before_c["ModelCallLimit<br/>before_model · 预算"]
         before_c -- 可继续 --> agent_c["agent / model<br/>ModelRetry · wrap_model_call"]
         before_c -. 达到模型上限 .-> end_c([END])
         agent_c --> tavily_limit_c["ToolLimit<br/>tavily · after_model"]
@@ -148,7 +148,6 @@ flowchart TB
         after_c -- 继续推理 --> before_c
     end
 
-    sse["/api/customer-service/chat · SSE"] --> start_c
     agent_c -. 运行期间流式事件 .-> events["token / tool_start / tool_end<br/>degraded 事件"]
     end_c --> done_c["done 事件"]
 
