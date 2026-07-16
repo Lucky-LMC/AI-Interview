@@ -1,6 +1,7 @@
 # AI智能面试辅助系统V1.0，作者刘梦畅
 """从已编译的 LangGraph/LangChain Graph 自动生成系统架构图。"""
 
+import re
 import shutil
 import subprocess
 import sys
@@ -40,20 +41,82 @@ def _display_name(name: str) -> str:
     return name
 
 
-def _graph_to_dot(graph, *, root_agent_name: str | None = None) -> str:
-    """Convert an official LangChain Graph to DOT without redefining its topology."""
+def _graph_to_dot(
+    graph,
+    *,
+    root_agent_name: str | None = None,
+    collapse_middleware: bool = True,
+) -> str:
+    """Convert the official Graph to a readable architecture projection."""
 
     connected_ids = {
         node_id
         for edge in graph.edges
         for node_id in (edge.source, edge.target)
     }
-    visible_nodes = {
+    connected_nodes = {
         node_id: node
         for node_id, node in graph.nodes.items()
         if node_id in connected_ids
     }
+    middleware_ids = {
+        node_id
+        for node_id, node in connected_nodes.items()
+        if "Middleware" in node.name
+    }
+    visible_nodes = {
+        node_id: node
+        for node_id, node in connected_nodes.items()
+        if not collapse_middleware or node_id not in middleware_ids
+    }
     node_refs = {node_id: f"n{index}" for index, node_id in enumerate(visible_nodes)}
+
+    if collapse_middleware:
+        adjacency = defaultdict(list)
+        for edge in graph.edges:
+            if edge.source in connected_nodes and edge.target in connected_nodes:
+                adjacency[edge.source].append(edge)
+
+        projected_edges = []
+        for source_id in visible_nodes:
+            for first_edge in adjacency[source_id]:
+                if first_edge.target in visible_nodes:
+                    projected_edges.append(
+                        (source_id, first_edge.target, first_edge.data, first_edge.conditional)
+                    )
+                    continue
+                if first_edge.target not in middleware_ids:
+                    continue
+
+                stack = [(first_edge.target, first_edge.data)]
+                visited = set()
+                while stack:
+                    current_id, path_label = stack.pop()
+                    if current_id in visited:
+                        continue
+                    visited.add(current_id)
+                    for next_edge in adjacency[current_id]:
+                        label = path_label if path_label is not None else next_edge.data
+                        if next_edge.target in visible_nodes:
+                            if source_id == next_edge.target:
+                                continue
+                            if (
+                                visible_nodes[source_id].name == "__start__"
+                                and visible_nodes[next_edge.target].name == "__end__"
+                            ):
+                                continue
+                            projected_edges.append(
+                                (source_id, next_edge.target, label, label is not None)
+                            )
+                        elif next_edge.target in middleware_ids:
+                            stack.append((next_edge.target, label))
+        render_edges = list(dict.fromkeys(projected_edges))
+    else:
+        render_edges = [
+            (edge.source, edge.target, edge.data, edge.conditional)
+            for edge in graph.edges
+            if edge.source in visible_nodes and edge.target in visible_nodes
+        ]
 
     groups: dict[str, list[str]] = defaultdict(list)
     root_nodes: list[str] = []
@@ -63,6 +126,12 @@ def _graph_to_dot(graph, *, root_agent_name: str | None = None) -> str:
             groups[group_name].append(node_id)
         else:
             root_nodes.append(node_id)
+
+    middleware_groups: dict[str, list[str]] = defaultdict(list)
+    if collapse_middleware:
+        for node_id in middleware_ids:
+            group_name = node_id.split(":", 1)[0] if ":" in node_id else "__root__"
+            middleware_groups[group_name].append(node_id)
 
     lines = [
         "digraph architecture {",
@@ -77,16 +146,35 @@ def _graph_to_dot(graph, *, root_agent_name: str | None = None) -> str:
         shape = "oval" if node.name in {"__start__", "__end__"} else "box"
         lines.append(f'{indent}{node_refs[node_id]} [label="{label}", shape={shape}];')
 
+    def add_middleware_summary(group_name: str, indent: str) -> str | None:
+        middleware_node_ids = middleware_groups.get(group_name, [])
+        if not middleware_node_ids:
+            return None
+        class_names = sorted({
+            connected_nodes[node_id].name.split(".", 1)[0].split("[", 1)[0]
+            for node_id in middleware_node_ids
+        })
+        safe_group_name = re.sub(r"[^A-Za-z0-9_]", "_", group_name)
+        summary_ref = f"middleware_{safe_group_name}"
+        label = _dot_escape("Middleware hooks (collapsed)\n" + "\n".join(class_names))
+        lines.append(
+            f'{indent}{summary_ref} [label="{label}", shape=note, '
+            'fillcolor="#fff7ed", color="#f59e0b"];'
+        )
+        return summary_ref
+
     if root_agent_name:
         lines.append("  subgraph cluster_root_agent {")
         lines.append(f'    label="{_dot_escape(root_agent_name)} / create_agent";')
         lines.append('    color="#7c3aed"; penwidth=1.5; style="rounded";')
         for node_id in root_nodes:
             add_node(node_id, "    ")
+        root_middleware_ref = add_middleware_summary("__root__", "    ")
         lines.append("  }")
     else:
         for node_id in root_nodes:
             add_node(node_id)
+        root_middleware_ref = add_middleware_summary("__root__", "  ")
 
     for index, (group_name, node_ids) in enumerate(groups.items()):
         node_names = {visible_nodes[node_id].name for node_id in node_ids}
@@ -99,19 +187,33 @@ def _graph_to_dot(graph, *, root_agent_name: str | None = None) -> str:
         lines.append('    color="#7c3aed"; penwidth=1.5; style="rounded";')
         for node_id in node_ids:
             add_node(node_id, "    ")
+        group_middleware_ref = add_middleware_summary(group_name, "    ")
         lines.append("  }")
+        if group_middleware_ref:
+            for node_id in node_ids:
+                if visible_nodes[node_id].name in {"model", "tools"}:
+                    lines.append(
+                        f'  {group_middleware_ref} -> {node_refs[node_id]} '
+                        '[style="dotted", arrowhead="none", color="#f59e0b"];'
+                    )
 
-    for edge in graph.edges:
-        if edge.source not in node_refs or edge.target not in node_refs:
-            continue
+    if root_middleware_ref:
+        for node_id in root_nodes:
+            if visible_nodes[node_id].name in {"model", "tools"}:
+                lines.append(
+                    f'  {root_middleware_ref} -> {node_refs[node_id]} '
+                    '[style="dotted", arrowhead="none", color="#f59e0b"];'
+                )
+
+    for source_id, target_id, edge_data, is_conditional in render_edges:
         attributes = []
-        if edge.data is not None:
-            attributes.append(f'label="{_dot_escape(edge.data)}"')
-        if edge.conditional:
+        if edge_data is not None:
+            attributes.append(f'label="{_dot_escape(edge_data)}"')
+        if is_conditional:
             attributes.append('style="dashed"')
         attribute_text = f" [{', '.join(attributes)}]" if attributes else ""
         lines.append(
-            f"  {node_refs[edge.source]} -> {node_refs[edge.target]}{attribute_text};"
+            f"  {node_refs[source_id]} -> {node_refs[target_id]}{attribute_text};"
         )
 
     lines.append("}")
@@ -151,7 +253,7 @@ def generate_combined_graph(show_window: bool = False) -> Path:
             "name": "面试工作流",
             "graph": create_interview_graph().get_graph(xray=True),
             "root_agent_name": None,
-            "title": "AI智能面试工作流程\n(create_agent 自动展开)",
+            "title": "AI智能面试工作流程\n(create_agent 子图 / Middleware 折叠)",
         },
         {
             "name": "顾问 Agent",

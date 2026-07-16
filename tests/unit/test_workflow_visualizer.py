@@ -10,9 +10,12 @@ def test_workflow_visualizer_expands_real_create_agent_subgraphs():
 
     assert "interviewer_agent / create_agent" in dot
     assert "feedback_agent / create_agent" in dot
-    assert "ModelCallLimitMiddleware.before_model" in dot
-    assert "search_interview_questions" in dot
-    assert "search_learning_resources" in dot
+    assert "Middleware hooks (collapsed)" in dot
+    assert "ModelCallLimitMiddleware" in dot
+    assert "ToolCallLimitMiddleware" in dot
+    assert "ModelCallLimitMiddleware.before_model" not in dot
+    assert "model" in dot
+    assert "tools" in dot
 
 
 def test_consultant_visualizer_uses_real_compiled_agent_graph():
@@ -22,5 +25,15 @@ def test_consultant_visualizer_uses_real_compiled_agent_graph():
     )
 
     assert "consultant_agent / create_agent" in dot
-    assert "search_knowledge_base" in dot
-    assert "tavily_search" in dot
+    assert "Middleware hooks (collapsed)" in dot
+    assert "model" in dot
+    assert "tools" in dot
+
+
+def test_debug_projection_can_keep_raw_middleware_hooks():
+    dot = _graph_to_dot(
+        create_interview_graph().get_graph(xray=True),
+        collapse_middleware=False,
+    )
+
+    assert "ModelCallLimitMiddleware.before_model" in dot
