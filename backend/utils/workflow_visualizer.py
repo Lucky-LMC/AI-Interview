@@ -6,6 +6,9 @@
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Add project root to Python path
 # 修正路径：backend/utils/workflow_visualizer.py -> backend/utils/ -> backend/ -> project_root
 project_root = Path(__file__).parent.parent.parent
@@ -32,21 +35,63 @@ def generate_combined_graph(show_window=False):
     plt.rcParams['axes.unicode_minus'] = False
     
     print("正在生成系统工作流全览图...")
+
+    def get_interview_graph():
+        """创建与实际八节点路由一致的高层面试工作流图。"""
+        from langchain_core.runnables.graph import Graph
+
+        graph = Graph()
+        start = graph.add_node(None, "workflow_start")
+        parse_resume = graph.add_node(None, "parse_resume")
+        validate_resume = graph.add_node(None, "validate_resume")
+        interviewer = graph.add_node(None, "interviewer_agent")
+        review = graph.add_node(None, "review_question")
+        answer = graph.add_node(None, "human_answer_interrupt")
+        check_finish = graph.add_node(None, "check_finish")
+        feedback = graph.add_node(None, "feedback_agent")
+        report = graph.add_node(None, "generate_report")
+        end = graph.add_node(None, "workflow_end")
+
+        graph.add_edge(start, parse_resume)
+        graph.add_edge(parse_resume, validate_resume)
+        graph.add_edge(validate_resume, interviewer, "valid", conditional=True)
+        graph.add_edge(validate_resume, end, "invalid", conditional=True)
+        graph.add_edge(interviewer, review)
+        graph.add_edge(review, interviewer, "rewrite once", conditional=True)
+        graph.add_edge(review, answer, "approved", conditional=True)
+        graph.add_edge(answer, check_finish)
+        graph.add_edge(check_finish, interviewer, "continue", conditional=True)
+        graph.add_edge(check_finish, feedback, "finish", conditional=True)
+        graph.add_edge(feedback, report)
+        graph.add_edge(report, end)
+        return graph
     
     def get_consultant_graph():
-        """复用实际的 create_agent 图，保证可视化与运行时一致。"""
-        from backend.graph.agents.consultant_agent import consultant_agent
+        """创建与实际 Agent 策略一致的高层顾问架构图。"""
+        from langchain_core.runnables.graph import Graph
 
-        return consultant_agent
+        graph = Graph()
+        user = graph.add_node(None, "user_question")
+        agent = graph.add_node(None, "consultant_agent")
+        knowledge = graph.add_node(None, "search_knowledge_base")
+        web = graph.add_node(None, "tavily_search")
+        response = graph.add_node(None, "streaming_response")
+        graph.add_edge(user, agent)
+        graph.add_edge(agent, knowledge, "required")
+        graph.add_edge(knowledge, agent, "evidence")
+        graph.add_edge(agent, web, "low confidence", conditional=True)
+        graph.add_edge(web, agent, "sources")
+        graph.add_edge(agent, response)
+        return graph
 
     graphs = [
         {
             "name": "面试工作流",
-            "import": lambda: __import__('backend.graph.workflow', fromlist=['create_interview_graph']).create_interview_graph(),
-            "title": "AI智能面试工作流程"
+            "import": get_interview_graph,
+            "title": "AI智能面试工作流程\n(异步重试 / 超时 / 恢复)"
         },
         {
-            "name": "客服 Agent",
+            "name": "顾问 Agent",
             "import": get_consultant_graph,
             "title": "面试顾问智能体\n(consultant_agent)"
         }
@@ -60,7 +105,8 @@ def generate_combined_graph(show_window=False):
             print(f"  - 渲染 {g_conf['name']}...")
             # 执行 lambda 函数以获取图对象
             graph_obj = g_conf["import"]()
-            img_bytes = graph_obj.get_graph(xray=True).draw_mermaid_png()
+            graph_view = graph_obj.get_graph(xray=False) if hasattr(graph_obj, "get_graph") else graph_obj
+            img_bytes = graph_view.draw_mermaid_png(max_retries=5, retry_delay=2.0)
             img = PILImage.open(BytesIO(img_bytes))
             images.append(img)
         except Exception as e:
