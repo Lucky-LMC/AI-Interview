@@ -20,6 +20,7 @@ from backend.models import ConsultantRecord
 from fastapi.responses import StreamingResponse
 import json
 from datetime import datetime
+from backend.graph.runtime.tracing import public_tool_events
 
 router = APIRouter(prefix="/api/customer-service", tags=["customer-service"])
 
@@ -165,10 +166,15 @@ async def chat_with_agent_stream(
                             tools_used.append(tool_name)
                         status_msg = f"🛠️ 正在使用工具: {tool_name}"
                     
+                    for public_event in public_tool_events(event):
+                        yield f"data: {json.dumps(public_event, ensure_ascii=False)}\n\n"
+                    # 保留 status 事件，兼容旧前端。
                     yield f"data: {json.dumps({'type': 'status', 'content': status_msg}, ensure_ascii=False)}\n\n"
                 
                 # 监听工具调用结束
                 elif kind == "on_tool_end":
+                    for public_event in public_tool_events(event):
+                        yield f"data: {json.dumps(public_event, ensure_ascii=False)}\n\n"
                     yield f"data: {json.dumps({'type': 'status', 'content': ''}, ensure_ascii=False)}\n\n"
             
             print(f"[Consultant] 🤖 回答生成完毕 (长度: {len(full_response)} 字符)")
@@ -243,11 +249,11 @@ async def chat_with_agent_stream(
                 fallback_msg = "抱歉，我暂时无法回答这个问题。可能是需要的信息未找到。您可以尝试换个方式提问。"
                 yield f"data: {json.dumps({'type': 'token', 'content': fallback_msg}, ensure_ascii=False)}\n\n"
                 
-        except Exception as e:
-            print(f"[Consultant] 流式对话错误：{e}")
+        except Exception:
+            print("[Consultant] 流式对话失败，已返回安全错误事件")
             import traceback
             traceback.print_exc()
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': '服务暂时不可用，请稍后重试'}, ensure_ascii=False)}\n\n"
         finally:
             db.close()
     

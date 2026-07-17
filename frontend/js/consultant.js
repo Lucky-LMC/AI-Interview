@@ -362,7 +362,7 @@ async function handleDeleteSessionFromBackend(threadId) {
 // 工具函数：获取工具显示名称
 // ====================================================================
 function getToolDisplayName(tool) {
-    if (tool === 'knowledge_base') return '🔍 知识库搜索';
+    if (tool === 'knowledge_base' || tool === 'search_knowledge_base') return '🔍 知识库搜索';
     if (tool === 'tavily_search') return '🌐 联网搜索';
     return `🛠️ ${tool}`;
 }
@@ -529,6 +529,23 @@ async function handleSendMessage() {
                                     statusDiv.style.cssText = 'font-size: 12px; color: #666; margin-bottom: 5px; font-style: italic;';
                                     statusDiv.style.display = 'block';
                                 }
+                                break;
+
+                            case 'tool_start':
+                                detectedTools.add(event.tool === 'search_knowledge_base' ? 'knowledge_base' : event.tool);
+                                statusDiv.textContent = `${getToolDisplayName(event.tool)} 执行中...`;
+                                statusDiv.style.display = 'block';
+                                break;
+
+                            case 'tool_end':
+                                statusDiv.textContent = `${getToolDisplayName(event.tool)} 已完成`;
+                                statusDiv.style.display = 'block';
+                                break;
+
+                            case 'degraded':
+                                statusDiv.textContent = '部分外部能力不可用，已自动切换降级路径';
+                                statusDiv.style.cssText = 'font-size: 12px; color: #b7791f; margin-bottom: 8px;';
+                                statusDiv.style.display = 'block';
                                 break;
 
                             case 'done':

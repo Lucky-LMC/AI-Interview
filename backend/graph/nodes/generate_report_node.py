@@ -5,9 +5,10 @@
 """
 from backend.graph.state import InterviewState
 from backend.graph.llm import openai_llm  # 报告生成不需要工具调用，用 DeepSeek
+from backend.graph.runtime.errors import ErrorCategory, classify_exception
 
 
-def generate_report_node(state: InterviewState) -> InterviewState:
+async def generate_report_node(state: InterviewState) -> InterviewState:
     """
     生成最终面试报告：
     整合简历、面试记录、学习资源，生成完整报告
@@ -84,7 +85,7 @@ def generate_report_node(state: InterviewState) -> InterviewState:
         print("[generate_report_node] 正在生成最终报告...")
         
         # 调用 LLM 生成报告
-        response = openai_llm.invoke(prompt)
+        response = await openai_llm.ainvoke(prompt)
         full_report = response.content
         
         print(f"[generate_report_node] 报告生成完成，长度: {len(full_report)}")
@@ -95,8 +96,10 @@ def generate_report_node(state: InterviewState) -> InterviewState:
         return new_state
             
     except Exception as e:
+        if classify_exception(e) is ErrorCategory.TRANSIENT:
+            raise
         print(f"[generate_report_node] 报告生成失败: {e}")
         new_state = state.copy()
-        new_state['report'] = f"# 生成报告失败\n\n系统错误: {str(e)}"
+        new_state['report'] = "# 面试报告\n\n报告生成服务暂时不可用，请稍后重试。"
         return new_state
 

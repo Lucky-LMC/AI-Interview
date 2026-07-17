@@ -3,9 +3,12 @@
 面试教练 Agent 定义
 根据面试表现，联网搜索并推荐学习资源
 """
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from backend.graph.llm import openai_llm
 from backend.graph.tools.feedback_tools import feedback_tools
+from backend.graph.runtime.middleware import build_agent_middleware
+from backend.graph.runtime.policies import AgentPolicy
+from backend.models.schemas import FeedbackRecommendations
 
 
 # Agent 系统提示词
@@ -44,14 +47,17 @@ A: 我不太清楚具体细节..."
 """
 
 
-def create_feedback_agent():
+def create_feedback_agent(model=None):
     """
     创建面试反馈 Agent
     """
-    agent = create_react_agent(
-        model=openai_llm,
+    agent = create_agent(
+        model=model or openai_llm,
         tools=feedback_tools,
-        prompt=FEEDBACK_AGENT_PROMPT
+        system_prompt=FEEDBACK_AGENT_PROMPT,
+        middleware=build_agent_middleware(AgentPolicy.feedback()),
+        response_format=FeedbackRecommendations,
+        name="feedback_agent",
     )
     return agent
 

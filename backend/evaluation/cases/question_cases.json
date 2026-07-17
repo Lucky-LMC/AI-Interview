@@ -1,0 +1,23 @@
+[
+  {
+    "id": "question-project-specific",
+    "round": 2,
+    "resume_text": "WorkMind 项目使用 LangGraph 构建 Agent 工作流",
+    "question": "你在WorkMind项目中如何设计LangGraph工作流，遇到过哪些技术权衡？",
+    "expected_route": "approve"
+  },
+  {
+    "id": "question-obviously-invalid",
+    "round": 2,
+    "resume_text": "WorkMind 项目使用 LangGraph",
+    "question": "你好",
+    "expected_route": "rewrite"
+  },
+  {
+    "id": "question-borderline-definition",
+    "round": 2,
+    "resume_text": "项目使用 RAG",
+    "question": "什么是RAG？",
+    "expected_route": "judge"
+  }
+]

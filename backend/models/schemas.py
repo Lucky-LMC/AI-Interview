@@ -67,6 +67,35 @@ class QuestionReviewResult(BaseModel):
     issues: List[str] = Field(default_factory=list, description="问题质量缺陷")
     rewrite_instruction: str = Field("", description="重写问题时需要遵守的要求")
     used_fallback: bool = Field(False, description="是否使用了预置题型兜底")
+    decision_source: str = Field("rules", description="rules、judge 或 fallback")
+
+
+class InterviewQuestion(BaseModel):
+    """面试官 Agent 的结构化最终输出。"""
+
+    question: str = Field(..., min_length=8, description="只包含一个面试问题")
+    resume_evidence: List[str] = Field(
+        default_factory=list,
+        description="问题引用的简历项目、技术或经历证据",
+    )
+    round_focus: str = Field(..., description="当前轮次考察重点")
+
+
+class LearningResourceRecommendation(BaseModel):
+    """单条有来源的学习资源建议。"""
+
+    topic: str
+    title: str
+    url: Optional[str] = None
+    reason: str = ""
+
+
+class FeedbackRecommendations(BaseModel):
+    """反馈 Agent 的结构化最终输出。"""
+
+    summary: str = Field(..., description="候选人主要改进方向摘要")
+    weaknesses: List[str] = Field(default_factory=list, max_length=3)
+    resources: List[LearningResourceRecommendation] = Field(default_factory=list)
 
 # --- Responses ---
 

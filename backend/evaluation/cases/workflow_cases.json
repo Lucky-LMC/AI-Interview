@@ -1,0 +1,4 @@
+[
+  {"id": "workflow-invalid-resume", "resume_valid": false, "expected_route": "invalid"},
+  {"id": "workflow-valid-resume", "resume_valid": true, "expected_route": "valid"}
+]

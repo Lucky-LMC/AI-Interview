@@ -4,6 +4,8 @@
 包含学习资源搜索工具
 """
 from langchain_core.tools import tool
+from backend.graph.runtime import SourceRef, ToolResult
+from backend.graph.runtime.tool_runtime import timed_tool_call
 
 
 @tool
@@ -17,39 +19,42 @@ def search_learning_resources(topic: str) -> str:
     Returns:
         搜索到的学习资源，包含书籍、课程、文章链接等
     """
-    from backend.config import TAVILY_API_KEY
+    from backend import config
     from tavily import TavilyClient
 
-    if not TAVILY_API_KEY:
-        print("[search_learning_resources] 未配置 TAVILY_API_KEY")
-        return "搜索失败: 未配置 TAVILY_API_KEY"
-
-    try:
-        print(f"[search_learning_resources] 正在搜索: {topic}")
-        tavily = TavilyClient(api_key=TAVILY_API_KEY)
-        
-        # 直接使用此 Topic 进行搜索
-        query = topic
-        
-        # 执行搜索
-        response = tavily.search(query=query, search_depth="advanced", max_results=2)
+    def _search() -> ToolResult:
+        tavily = TavilyClient(api_key=config.TAVILY_API_KEY)
+        response = tavily.search(
+            query=topic,
+            search_depth="advanced",
+            max_results=2,
+        )
         results = response.get("results", [])
-        
-        if results:
-            # 整理搜索结果
-            resources = []
-            for res in results:
-                resources.append(f"- [{res['title']}]({res['url']})\n  {res['content'][:150]}...")
-            
-            result_text = "\n\n".join(resources)
-            print(f"[search_learning_resources] 找到 {len(results)} 个资源")
-            return f"【{topic} - 学习资源】\n{result_text}"
-        else:
-            return f"未找到关于 {topic} 的学习资源"
-            
-    except Exception as e:
-        print(f"[search_learning_resources] 搜索失败: {e}")
-        return f"搜索失败: {str(e)}"
+        sources = [
+            SourceRef(title=item.get("title", "学习资源"), url=item.get("url"))
+            for item in results
+        ]
+        resources = [
+            {
+                "title": item.get("title", "学习资源"),
+                "url": item.get("url"),
+                "summary": item.get("content", "")[:300],
+            }
+            for item in results
+        ]
+        return ToolResult.success(
+            data={"topic": topic, "resources": resources},
+            sources=sources,
+            degraded=not bool(resources),
+        )
+
+    result = timed_tool_call(
+        "learning_resource_search",
+        _search,
+        missing_config=None if config.TAVILY_API_KEY else "TAVILY_API_KEY",
+        propagate_transient=True,
+    )
+    return result.model_dump_json()
 
 
 # 导出工具列表
