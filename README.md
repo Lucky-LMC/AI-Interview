@@ -22,7 +22,7 @@
 ### 系统完整流程
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 22, "padding": 5}, "themeVariables": {"fontSize": "12px"}}}%%
+%%{init: {"flowchart": {"nodeSpacing": 50, "rankSpacing": 24, "padding": 5}, "themeVariables": {"fontSize": "12px"}}}%%
 flowchart TB
     subgraph interview_flow["主面试流程 · LangGraph StateGraph"]
         direction TB
@@ -33,9 +33,9 @@ flowchart TB
         validate -- 无效 --> invalid_end([END])
         validate -- 有效 --> interviewer[["Interviewer Agent 子图<br/>ask_question_node → create_agent"]]
         interviewer --> review{"问题质量门禁<br/>review_question"}
-        review -- 重写一次 --> interviewer
         review -- 通过 --> answer["等待候选人回答<br/>answer · interrupt"]
         answer --> finish{"是否完成全部轮次<br/>check_finish"}
+        review -- 重写一次 --> interviewer
         finish -- 继续下一题 --> interviewer
         finish -- 完成 --> feedback[["Feedback Agent 子图<br/>feedback_node → create_agent"]]
         feedback --> report["生成面试报告<br/>generate_report"]
@@ -64,7 +64,7 @@ flowchart TB
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 14, "rankSpacing": 18, "padding": 4}, "themeVariables": {"fontSize": "11px"}}}%%
 flowchart TB
-    subgraph interviewer_graph["Interviewer Agent · create_agent 编译子图"]
+    subgraph interviewer_graph[" "]
         direction TB
         start_i([START]) --> before_i["ModelCallLimit<br/>before_model · 预算"]
         before_i -- 可继续 --> agent_i["agent / model<br/>ModelRetry · wrap_model_call"]
@@ -98,7 +98,7 @@ Interviewer 的业务工具由 `tools` 节点统一表示，实际注册的是 `
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 14, "rankSpacing": 18, "padding": 4}, "themeVariables": {"fontSize": "11px"}}}%%
 flowchart TB
-    subgraph feedback_graph["Feedback Agent · create_agent 编译子图"]
+    subgraph feedback_graph[" "]
         direction TB
         start_f([START]) --> before_f["ModelCallLimit<br/>before_model · 预算"]
         before_f -- 可继续 --> agent_f["agent / model<br/>ModelRetry · wrap_model_call"]
@@ -132,10 +132,9 @@ Feedback 的业务工具由 `tools` 节点统一表示，实际注册的是 `sea
 ```mermaid
 %%{init: {"flowchart": {"nodeSpacing": 14, "rankSpacing": 18, "padding": 4}, "themeVariables": {"fontSize": "11px"}}}%%
 flowchart TB
-    subgraph consultant_graph["Consultant Agent · create_agent 编译子图"]
+    subgraph consultant_graph[" "]
         direction TB
-        sse["/api/customer-service/chat · SSE"] --> start_c([START])
-        start_c --> before_c["ModelCallLimit<br/>before_model · 预算"]
+        start_c([START]) --> before_c["ModelCallLimit<br/>before_model · 预算"]
         before_c -- 可继续 --> agent_c["agent / model<br/>ModelRetry · wrap_model_call"]
         before_c -. 达到模型上限 .-> end_c([END])
         agent_c --> tavily_limit_c["ToolLimit<br/>tavily · after_model"]
@@ -161,12 +160,12 @@ flowchart TB
     class before_c,kb_limit_c,tavily_limit_c,global_c,after_c middleware;
     class agent_c agentCore;
     class tools_c tool;
-    class sse,events,done_c process;
+    class events,done_c process;
 
     style consultant_graph fill:#f8fbff,stroke:#2563eb,stroke-width:2px;
 ```
 
-Consultant 由独立 SSE 路由驱动，`tools` 节点统一表示 `search_knowledge_base` 和 `tavily_search`；工具调用完成后回到 Agent 继续判断，最终文本回答通过 SSE 输出。它没有结构化响应分支，模型预算为 5 次、全局工具预算为 2 次、每个工具最多 1 次。
+Consultant 由 `/api/customer-service/chat` 独立 SSE 路由驱动；图中 `tools` 节点统一表示 `search_knowledge_base` 和 `tavily_search`。工具调用完成后回到 Agent 继续判断，最终文本回答和运行期间事件通过 SSE 输出。它没有结构化响应分支，模型预算为 5 次、全局工具预算为 2 次、每个工具最多 1 次。
 
 图中的短标签对应完整中间件：`ModelCallLimit` = `ModelCallLimitMiddleware`，`ToolLimit` = `ToolCallLimitMiddleware`，`ModelRetry` / `ToolRetry` 分别对应模型和工具的 `wrap_*` 重试中间件；工具节点名称仍以正文和下表中的完整名称为准。
 
